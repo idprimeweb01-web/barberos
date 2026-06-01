@@ -1,0 +1,118 @@
+{% extends "barbeiro/base.html" %}
+{% block title %}Conta{% endblock %}
+
+{% block styles %}
+.rd-card { background: #242424; border: 1px solid #2d2d2d; border-radius: 12px; padding: 18px; margin-bottom: 12px; }
+.rd-title { font-size: 13px; font-weight: 700; color: #ccc; margin-bottom: 14px; }
+.rd-field { margin-bottom: 12px; }
+.rd-field label { display: block; font-size: 11px; color: #666; font-weight: 700; margin-bottom: 5px; text-transform: uppercase; letter-spacing: .3px; }
+.rd-field input {
+  width: 100%; padding: 12px 14px; background: #1e1e1e;
+  border: 1.5px solid #333; border-radius: 10px;
+  color: #fff; font-family: inherit; font-size: 15px; outline: none; transition: border-color .2s;
+}
+.rd-field input:focus { border-color: var(--cor-primaria); }
+.btn-full {
+  width: 100%; padding: 13px; border-radius: 12px;
+  font-size: 15px; font-weight: 700; cursor: pointer;
+  font-family: inherit; transition: all .15s; border: none;
+}
+.btn-full.gold { background: var(--cor-primaria); color: #fff; }
+.btn-full.ghost { background: none; border: 1px solid #333; color: #888; margin-top: 8px; }
+.btn-full.danger { background: rgba(220,38,38,.12); border: 1px solid rgba(220,38,38,.35); color: #f87171; margin-top: 8px; }
+.btn-full:disabled { opacity: .5; cursor: not-allowed; }
+{% endblock %}
+
+{% block content %}
+
+<!-- Alterar senha -->
+<div class="rd-card">
+  <div class="rd-title">Alterar senha</div>
+  <form id="formSenha" onsubmit="alterarSenha(event)">
+    <div class="rd-field">
+      <label>Senha atual *</label>
+      <input type="password" id="sAtual" required minlength="1" placeholder="••••••">
+    </div>
+    <div class="rd-field">
+      <label>Nova senha * (mín. 6)</label>
+      <input type="password" id="sNova" required minlength="6" placeholder="••••••">
+    </div>
+    <div class="rd-field">
+      <label>Confirmar nova senha *</label>
+      <input type="password" id="sConf" required minlength="6" placeholder="••••••">
+    </div>
+    <button type="submit" class="btn-full gold" id="btnAlterarSenha">Alterar senha</button>
+  </form>
+</div>
+
+<!-- Esqueci senha -->
+<div class="rd-card">
+  <div class="rd-title">Esqueci a senha</div>
+  <p style="font-size:13px;color:#666;margin-bottom:14px">
+    Clique abaixo para enviar uma solicitação de redefinição ao gestor.
+  </p>
+  <button class="btn-full ghost" id="btnEsqueci" onclick="esqueceuSenha()">Enviar solicitação ao gestor</button>
+</div>
+
+<!-- Sair -->
+<div class="rd-card">
+  <div class="rd-title">Sessão</div>
+  <button class="btn-full danger" onclick="confirmarLogout()">Sair da conta</button>
+</div>
+
+<!-- Modal confirmar logout -->
+<div class="modal-overlay" id="modalLogout" onclick="if(event.target===this)fecharModal('modalLogout')">
+  <div class="modal-box">
+    <div class="modal-handle"></div>
+    <div class="modal-header">
+      <h3>Sair da conta</h3>
+      <button class="modal-close" onclick="fecharModal('modalLogout')">×</button>
+    </div>
+    <p style="font-size:14px;color:#aaa;margin-bottom:18px">Tem certeza que deseja sair?</p>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="fecharModal('modalLogout')"
+        style="background:none;border:1px solid #333;color:#888;border-radius:9px;padding:10px 16px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">Cancelar</button>
+      <button onclick="api.logout()"
+        style="background:rgba(220,38,38,.12);border:1px solid rgba(220,38,38,.35);color:#f87171;border-radius:9px;padding:10px 20px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Sair</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function fecharModal(id) { document.getElementById(id).classList.remove('visible'); }
+  function abrirModal(id)  { document.getElementById(id).classList.add('visible'); }
+  function confirmarLogout() { abrirModal('modalLogout'); }
+
+  async function alterarSenha(e) {
+    e.preventDefault();
+    const nova = document.getElementById('sNova').value;
+    const conf = document.getElementById('sConf').value;
+    if (nova !== conf) { toast('As senhas não coincidem.', 'error'); return; }
+    const btn = document.getElementById('btnAlterarSenha');
+    btn.disabled = true; btn.textContent = 'Alterando…';
+    try {
+      await api.barbeiro.alterarSenha({
+        senha_atual: document.getElementById('sAtual').value,
+        nova_senha:  nova,
+      });
+      document.getElementById('formSenha').reset();
+      toast('Senha alterada com sucesso!');
+    } catch(err) { toast(err.message, 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Alterar senha'; }
+  }
+
+  async function esqueceuSenha() {
+    const btn = document.getElementById('btnEsqueci');
+    const u   = api.getUser();
+    if (!u?.email) { toast('Seu perfil não tem e-mail cadastrado.', 'error'); return; }
+    btn.disabled = true; btn.textContent = 'Enviando…';
+    try {
+      await api.barbeiro.esqueceuSenha(u.email);
+      toast('Solicitação enviada ao gestor!');
+    } catch(err) { toast(err.message, 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Enviar solicitação ao gestor'; }
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,632 @@
+{% extends "gestor/base.html" %}
+{% block title %}Clientes{% endblock %}
+{% block page_title %}Clientes{% endblock %}
+
+{% block styles %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+/* ── Métricas ──────────────────────────────────────── */
+.cli-metrics {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+@media (max-width: 1200px) { .cli-metrics { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 600px)  { .cli-metrics { grid-template-columns: repeat(2, 1fr); } }
+.cli-metric {
+  background: #242424; border: 1px solid #2d2d2d; border-radius: 10px;
+  padding: 14px 16px;
+}
+.cli-metric-icon { font-size: 18px; margin-bottom: 4px; }
+.cli-metric-label { font-size: 10px; color: #555; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; }
+.cli-metric-val { font-size: 22px; font-weight: 800; color: var(--cor-primaria); line-height: 1.1; margin: 3px 0; }
+.cli-metric-sub { font-size: 11px; color: #444; }
+
+/* ── Filtros ────────────────────────────────────────── */
+.filter-bar {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  background: #242424; border: 1px solid #2d2d2d; border-radius: 10px;
+  padding: 12px 14px; margin-bottom: 16px;
+}
+.filter-bar input, .filter-bar select {
+  padding: 7px 11px; background: #1e1e1e; border: 1.5px solid #2d2d2d;
+  border-radius: 7px; color: #ccc; font-family: inherit; font-size: 13px; outline: none;
+  transition: border-color .2s;
+}
+.filter-bar input  { flex: 1; min-width: 180px; }
+.filter-bar select { min-width: 140px; cursor: pointer; }
+.filter-bar input:focus, .filter-bar select:focus { border-color: var(--cor-primaria); }
+.filter-bar select option { background: #1e1e1e; }
+.btn-filtrar {
+  padding: 7px 14px; background: var(--cor-primaria); border: none; color: #fff;
+  border-radius: 7px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: inherit;
+}
+.btn-limpar {
+  padding: 7px 14px; background: none; border: 1px solid #333; color: #666;
+  border-radius: 7px; font-size: 13px; cursor: pointer; font-family: inherit;
+}
+.btn-limpar:hover { border-color: #555; color: #aaa; }
+.btn-csv {
+  padding: 7px 14px; background: none; border: 1px solid #333; color: #888;
+  border-radius: 7px; font-size: 12px; cursor: pointer; font-family: inherit; margin-left: auto;
+}
+.btn-csv:hover { border-color: var(--cor-primaria); color: var(--cor-primaria); }
+
+/* ── Bulk bar ───────────────────────────────────────── */
+.bulk-bar {
+  display: none; align-items: center; gap: 12px;
+  background: rgba(186,117,23,.08); border: 1px solid rgba(186,117,23,.2);
+  border-radius: 8px; padding: 10px 14px; margin-bottom: 12px;
+  font-size: 13px; font-weight: 600; color: var(--cor-primaria);
+}
+.bulk-bar.visible { display: flex; }
+.btn-bulk-desat {
+  padding: 6px 12px; background: rgba(220,38,38,.15); border: 1px solid rgba(220,38,38,.3);
+  color: #f87171; border-radius: 6px; font-size: 12px; font-weight: 700;
+  cursor: pointer; font-family: inherit;
+}
+.btn-bulk-cancel {
+  padding: 6px 12px; background: none; border: 1px solid #333;
+  color: #666; border-radius: 6px; font-size: 12px; cursor: pointer; font-family: inherit;
+}
+
+/* ── Status badges ──────────────────────────────────── */
+.badge-vip     { background: rgba(251,191,36,.15); color: #fbbf24; border-radius:999px; padding:2px 8px; font-size:11px; font-weight:700; }
+.badge-novo    { background: rgba(59,130,246,.15);  color: #60a5fa; border-radius:999px; padding:2px 8px; font-size:11px; font-weight:700; }
+.badge-ativo   { background: rgba(34,197,94,.12);   color: #4ade80; border-radius:999px; padding:2px 8px; font-size:11px; font-weight:700; }
+.badge-inativo { background: rgba(255,255,255,.07); color: #666;    border-radius:999px; padding:2px 8px; font-size:11px; font-weight:700; }
+.badge-risco   { background: rgba(220,38,38,.15);   color: #f87171; border-radius:999px; padding:2px 8px; font-size:11px; font-weight:700; }
+
+/* ── Insights ───────────────────────────────────────── */
+.insights-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 12px; margin-top: 20px;
+}
+@media (max-width: 900px) { .insights-grid { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 500px) { .insights-grid { grid-template-columns: 1fr; } }
+.insight-card {
+  background: #242424; border-radius: 10px; overflow: hidden;
+}
+.insight-head {
+  padding: 10px 14px; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .5px;
+  display: flex; align-items: center; gap: 6px;
+}
+.insight-head.risco   { background: rgba(220,38,38,.1);  color: #f87171; border-bottom: 1px solid rgba(220,38,38,.15); }
+.insight-head.followup{ background: rgba(251,191,36,.08); color: #fbbf24; border-bottom: 1px solid rgba(251,191,36,.12); }
+.insight-head.novos   { background: rgba(59,130,246,.08); color: #60a5fa; border-bottom: 1px solid rgba(59,130,246,.12); }
+.insight-head.top5    { background: rgba(186,117,23,.08); color: var(--cor-primaria); border-bottom: 1px solid rgba(186,117,23,.12); }
+.insight-body { padding: 0; }
+.insight-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 14px; border-bottom: 1px solid #252525; cursor: pointer;
+  transition: background .1s; font-size: 13px;
+}
+.insight-row:last-child { border-bottom: none; }
+.insight-row:hover { background: rgba(255,255,255,.025); }
+.insight-nome { font-weight: 600; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 110px; }
+.insight-meta { font-size: 11px; color: #555; }
+.insight-val  { font-size: 12px; font-weight: 700; flex-shrink: 0; margin-left: 8px; }
+.insight-empty { padding: 16px 14px; color: #333; font-size: 13px; }
+
+/* ── Tabela — avatar ────────────────────────────────── */
+.cli-av {
+  width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0;
+  background: rgba(186,117,23,.12); border: 1.5px solid rgba(186,117,23,.2);
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: var(--cor-primaria); overflow: hidden;
+}
+.cli-av img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.cli-nome-cell { display: flex; align-items: center; gap: 8px; }
+
+/* ── Modal perfil ───────────────────────────────────── */
+.mp-stat-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+.mp-stat { background: #1e1e1e; border: 1px solid #2d2d2d; border-radius: 8px; padding: 10px; text-align: center; }
+.mp-stat-val { font-size: 18px; font-weight: 800; color: var(--cor-primaria); }
+.mp-stat-lbl { font-size: 10px; color: #555; font-weight: 700; text-transform: uppercase; margin-top: 2px; }
+.mp-hist { font-size: 13px; }
+.mp-hist-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #252525; }
+.mp-hist-row:last-child { border-bottom: none; }
+.mp-info-row { display: flex; justify-content: space-between; padding: 7px 0; border-bottom: 1px solid #252525; font-size: 13px; }
+.mp-info-row:last-child { border-bottom: none; }
+.mp-section { font-size: 10px; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: .5px; margin: 14px 0 6px; }
+
+/* ── Edit form ──────────────────────────────────────── */
+.ef-field { margin-bottom: 14px; }
+.ef-field label { display: block; font-size: 12px; color: #555; font-weight: 600; margin-bottom: 5px; }
+.ef-field input, .ef-field textarea {
+  width: 100%; padding: 9px 12px; background: #1e1e1e; border: 1.5px solid #2d2d2d;
+  border-radius: 8px; color: #ccc; font-family: inherit; font-size: 14px; outline: none;
+  transition: border-color .2s; resize: vertical;
+}
+.ef-field input:focus, .ef-field textarea:focus { border-color: var(--cor-primaria); }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Métricas -->
+<div class="cli-metrics" id="metricsGrid">
+  <div class="cli-metric">
+    <div class="cli-metric-icon">📊</div>
+    <div class="cli-metric-label">Total</div>
+    <div class="cli-metric-val" id="mTotal">—</div>
+  </div>
+  <div class="cli-metric">
+    <div class="cli-metric-icon">📈</div>
+    <div class="cli-metric-label">Novos (mês)</div>
+    <div class="cli-metric-val" id="mNovos">—</div>
+  </div>
+  <div class="cli-metric">
+    <div class="cli-metric-icon">📉</div>
+    <div class="cli-metric-label">Inativos &gt;30d</div>
+    <div class="cli-metric-val" id="mInativos">—</div>
+  </div>
+  <div class="cli-metric">
+    <div class="cli-metric-icon">💰</div>
+    <div class="cli-metric-label">Ticket médio</div>
+    <div class="cli-metric-val" id="mTicket">—</div>
+  </div>
+  <div class="cli-metric">
+    <div class="cli-metric-icon">🔄</div>
+    <div class="cli-metric-label">Retenção</div>
+    <div class="cli-metric-val" id="mRetencao">—</div>
+    <div class="cli-metric-sub">voltaram ao menos 2x</div>
+  </div>
+  <div class="cli-metric">
+    <div class="cli-metric-icon">⭐</div>
+    <div class="cli-metric-label">VIP (&gt;R$500)</div>
+    <div class="cli-metric-val" id="mVip">—</div>
+  </div>
+</div>
+
+<!-- Filtros -->
+<div class="filter-bar">
+  <input type="text" id="fBusca" placeholder="🔍 Buscar nome, telefone ou e-mail…" oninput="_debouncarFiltros()">
+  <select id="fStatus" onchange="aplicarFiltros()">
+    <option value="">Todos os status</option>
+    <option value="ativo">✅ Ativos</option>
+    <option value="novos">🆕 Novos (&lt;7d)</option>
+    <option value="inativos">😴 Inativos (&gt;30d)</option>
+    <option value="em_risco">⚠️ Em risco (&gt;60d)</option>
+    <option value="vip">⭐ VIP (&gt;R$500)</option>
+  </select>
+  <select id="fBarbeiro" onchange="aplicarFiltros()">
+    <option value="">Todos os barbeiros</option>
+  </select>
+  <button class="btn-filtrar" onclick="aplicarFiltros()">Filtrar</button>
+  <button class="btn-limpar"  onclick="limparFiltros()">Limpar</button>
+  <button class="btn-csv"     onclick="exportarCSV()">📥 CSV</button>
+</div>
+
+<!-- Gráfico -->
+<div class="chart-wrap" style="margin-bottom:20px">
+  <div class="chart-title">Novos clientes por mês</div>
+  <canvas id="chartNovos" height="70"></canvas>
+</div>
+
+<!-- Bulk bar -->
+<div class="bulk-bar" id="bulkBar">
+  <span id="bulkCount">0 selecionados</span>
+  <button class="btn-bulk-desat" onclick="desativarSelecionados()">Desativar selecionados</button>
+  <button class="btn-bulk-cancel" onclick="cancelarSelecao()">Cancelar</button>
+</div>
+
+<!-- Tabela -->
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th style="width:36px"><input type="checkbox" id="checkAll" onchange="toggleAll(this)" style="cursor:pointer;accent-color:var(--cor-primaria)"></th>
+        <th>Cliente</th>
+        <th>Telefone</th>
+        <th>E-mail</th>
+        <th style="text-align:center">Visitas</th>
+        <th style="text-align:right">Gasto Total</th>
+        <th style="text-align:right">Ticket</th>
+        <th>Última Visita</th>
+        <th style="text-align:center">Status</th>
+        <th>Ações</th>
+      </tr>
+    </thead>
+    <tbody id="tbody">
+      <tr><td colspan="10" style="text-align:center;color:#444;padding:32px">Carregando…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Insights -->
+<div class="insights-grid" id="insightsGrid">
+  <!-- preenchido via JS -->
+</div>
+
+<!-- ── Modal Perfil ─────────────────────────────────── -->
+<div class="modal-overlay" id="modalPerfil" onclick="if(event.target===this)fecharModal('modalPerfil')">
+  <div class="modal-box" style="max-width:540px">
+    <div class="modal-header">
+      <h3 id="mpTitulo">Perfil</h3>
+      <button class="modal-close" onclick="fecharModal('modalPerfil')">×</button>
+    </div>
+    <div id="mpBody"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" style="width:auto;padding:9px 18px" onclick="fecharModal('modalPerfil')">Fechar</button>
+      <button class="btn btn-primary" style="width:auto;padding:9px 18px" id="btnAbrirEdicao" onclick="abrirEdicao()">Editar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal Edição ─────────────────────────────────── -->
+<div class="modal-overlay" id="modalEdicao" onclick="if(event.target===this)fecharModal('modalEdicao')">
+  <div class="modal-box" style="max-width:440px">
+    <div class="modal-header">
+      <h3>Editar Cliente</h3>
+      <button class="modal-close" onclick="fecharModal('modalEdicao')">×</button>
+    </div>
+    <form onsubmit="salvarEdicao(event)">
+      <div class="ef-field" style="display:flex;flex-direction:column;align-items:center;margin-bottom:18px">
+        <label style="align-self:flex-start">Foto</label>
+        <div id="wFotoCliente"></div>
+      </div>
+      <div class="ef-field"><label>Nome *</label><input type="text" id="eNome" required></div>
+      <div class="ef-field"><label>E-mail</label><input type="email" id="eEmail" placeholder="opcional"></div>
+      <div class="ef-field"><label>Observações</label><textarea id="eObs" rows="3"></textarea></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" style="width:auto;padding:9px 18px" onclick="fecharModal('modalEdicao')">Cancelar</button>
+        <button type="submit" id="btnSalvarEdicao" class="btn btn-primary" style="width:auto;padding:9px 24px">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let _dados = null;
+  let _chart = null;
+  let _editId = null;
+  let _debT = null;
+
+  function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function fmtR(v){ return 'R$ '+Number(v||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  function fmtData(iso){ return iso ? new Date(iso).toLocaleDateString('pt-BR') : '—'; }
+  function diasAtras(iso){ if(!iso) return '—'; const d=Math.floor((Date.now()-new Date(iso))/86400000); if(d===0) return 'hoje'; if(d===1) return 'ontem'; return `${d}d atrás`; }
+  function initials(n){ return (n||'?').trim().split(' ').map(w=>w[0]).slice(0,2).join('').toUpperCase(); }
+
+  // ── Carregar ─────────────────────────────────────────────
+  async function carregar(opts = {}) {
+    try {
+      _dados = await api.clientes.listarAdmin(opts);
+      renderMetrics(_dados.stats);
+      renderChart(_dados.chart_novos);
+      renderTabela(_dados.clientes);
+      renderInsights(_dados.insights);
+    } catch(e) {
+      document.getElementById('tbody').innerHTML =
+        `<tr><td colspan="10" style="text-align:center;color:#f87171;padding:24px">${esc(e.message)}</td></tr>`;
+    }
+  }
+
+  function _debouncarFiltros() {
+    clearTimeout(_debT);
+    _debT = setTimeout(aplicarFiltros, 350);
+  }
+
+  function aplicarFiltros() {
+    carregar({
+      q:          document.getElementById('fBusca').value.trim(),
+      status:     document.getElementById('fStatus').value,
+      barbeiro_id:document.getElementById('fBarbeiro').value || undefined,
+    });
+  }
+
+  function limparFiltros() {
+    document.getElementById('fBusca').value = '';
+    document.getElementById('fStatus').value = '';
+    document.getElementById('fBarbeiro').value = '';
+    carregar();
+  }
+
+  // ── Métricas ─────────────────────────────────────────────
+  function renderMetrics(s) {
+    document.getElementById('mTotal').textContent    = s.total;
+    document.getElementById('mNovos').textContent    = s.novos_mes;
+    document.getElementById('mInativos').textContent = s.inativos_30d;
+    document.getElementById('mTicket').textContent   = fmtR(s.ticket_medio);
+    document.getElementById('mRetencao').textContent = s.retencao_pct + '%';
+    document.getElementById('mVip').textContent      = s.vip;
+  }
+
+  // ── Gráfico ──────────────────────────────────────────────
+  function renderChart(data) {
+    if (_chart) _chart.destroy();
+    _chart = new Chart(document.getElementById('chartNovos'), {
+      type: 'bar',
+      data: {
+        labels:   data.map(d => d.label),
+        datasets: [{
+          label: 'Novos clientes', data: data.map(d => d.value),
+          backgroundColor: 'rgba(186,117,23,.3)',
+          borderColor: '#BA7517', borderWidth: 2, borderRadius: 5,
+        }],
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: '#2a2a2a' }, ticks: { color: '#555', font: { size: 11 } } },
+          y: { grid: { color: '#2a2a2a' }, ticks: { color: '#555', stepSize: 1 }, beginAtZero: true },
+        },
+      },
+    });
+  }
+
+  // ── Tabela ───────────────────────────────────────────────
+  const STATUS_BADGE = {
+    vip:      '<span class="badge-vip">⭐ VIP</span>',
+    novo:     '<span class="badge-novo">🆕 Novo</span>',
+    ativo:    '<span class="badge-ativo">Ativo</span>',
+    inativo:  '<span class="badge-inativo">Inativo</span>',
+    em_risco: '<span class="badge-risco">⚠️ Risco</span>',
+  };
+
+  function renderTabela(lista) {
+    const tb = document.getElementById('tbody');
+    document.getElementById('checkAll').checked = false;
+    document.getElementById('bulkBar').classList.remove('visible');
+    if (!lista.length) {
+      tb.innerHTML = '<tr><td colspan="10" style="text-align:center;color:#444;padding:32px">Nenhum cliente encontrado.</td></tr>';
+      return;
+    }
+    tb.innerHTML = lista.map(c => `
+      <tr>
+        <td><input type="checkbox" class="row-check" data-id="${c.id}"
+            onchange="atualizarBulkBar()"
+            style="cursor:pointer;accent-color:var(--cor-primaria)"></td>
+        <td>
+          <div class="cli-nome-cell">
+            <div class="cli-av">
+              ${c.foto ? `<img src="${esc(c.foto)}" alt="">` : initials(c.nome)}
+            </div>
+            <div>
+              <div style="font-weight:600;color:#ddd;font-size:13px">${esc(c.nome)}</div>
+              <div style="font-size:11px;color:#555">${fmtData(c.criado_em)}</div>
+            </div>
+          </div>
+        </td>
+        <td style="font-size:13px;color:#888">${esc(c.telefone)}</td>
+        <td style="font-size:12px;color:#666;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">
+          ${c.email ? esc(c.email) : '<span style="color:#333">—</span>'}
+        </td>
+        <td style="text-align:center;font-weight:700;color:var(--cor-primaria)">${c.total_visitas}</td>
+        <td style="text-align:right;font-weight:700;color:var(--cor-primaria)">${fmtR(c.total_gasto)}</td>
+        <td style="text-align:right;color:#888;font-size:13px">${c.total_visitas > 0 ? fmtR(c.ticket_medio) : '—'}</td>
+        <td style="font-size:12px;color:#666">${diasAtras(c.ultima_visita)}</td>
+        <td style="text-align:center">${STATUS_BADGE[c.status] || ''}</td>
+        <td>
+          <div class="td-actions">
+            <button class="btn-icon" onclick="verPerfil(${c.id})">Ver</button>
+            <button class="btn-icon" onclick="abrirEdicaoDirecta(${c.id},'${esc(c.nome).replace(/'/g,"\\'")}','${esc(c.email||'')}','','${(c.foto||'').replace(/'/g,"\\'")}')">Editar</button>
+            <button class="btn-icon danger" onclick="desativar(${c.id},'${esc(c.nome).replace(/'/g,"\\'")}')">Desativar</button>
+          </div>
+        </td>
+      </tr>`).join('');
+  }
+
+  // ── Insights ─────────────────────────────────────────────
+  function renderInsights(ins) {
+    const grid = document.getElementById('insightsGrid');
+
+    function card(type, icon, title, lista, valFn, valClass) {
+      const items = lista.length
+        ? lista.map(x => `
+            <div class="insight-row" onclick="verPerfil(${x.id})">
+              <div>
+                <div class="insight-nome">${esc(x.nome)}</div>
+                <div class="insight-meta">${esc(x.tel||'')}</div>
+              </div>
+              <div class="insight-val ${valClass}">${valFn(x)}</div>
+            </div>`).join('')
+        : `<div class="insight-empty">Nenhum no momento.</div>`;
+      return `
+        <div class="insight-card">
+          <div class="insight-head ${type}">${icon} ${title}</div>
+          <div class="insight-body">${items}</div>
+        </div>`;
+    }
+
+    grid.innerHTML =
+      card('risco',    '⚠️', 'Em Risco (>60d)',    ins.em_risco,
+           x => x.dias ? `${x.dias}d` : 'Nunca', 'badge-risco') +
+      card('followup', '🎯', 'Follow-up (7-30d)',   ins.follow_up,
+           x => `${x.dias}d`, 'badge-inativo') +
+      card('novos',    '🚀', 'Novos (<7d)',          ins.novos_7d,
+           () => 'Novo', 'badge-novo') +
+      card('top5',     '⭐', 'Top 5 por Gasto',      ins.top5,
+           x => fmtR(x.gasto), 'badge-vip');
+  }
+
+  // ── Bulk select ──────────────────────────────────────────
+  function toggleAll(cb) {
+    document.querySelectorAll('.row-check').forEach(c => c.checked = cb.checked);
+    atualizarBulkBar();
+  }
+  function atualizarBulkBar() {
+    const sel = document.querySelectorAll('.row-check:checked').length;
+    const bar = document.getElementById('bulkBar');
+    document.getElementById('checkAll').checked =
+      sel === document.querySelectorAll('.row-check').length && sel > 0;
+    bar.classList.toggle('visible', sel > 0);
+    if (sel) document.getElementById('bulkCount').textContent =
+      `${sel} cliente${sel > 1 ? 's' : ''} selecionado${sel > 1 ? 's' : ''}`;
+  }
+  function cancelarSelecao() {
+    document.querySelectorAll('.row-check').forEach(c => c.checked = false);
+    document.getElementById('checkAll').checked = false;
+    document.getElementById('bulkBar').classList.remove('visible');
+  }
+  async function desativarSelecionados() {
+    const ids = [...document.querySelectorAll('.row-check:checked')].map(c => +c.dataset.id);
+    if (!confirm(`Desativar ${ids.length} cliente(s)?`)) return;
+    let erros = 0;
+    for (const id of ids) { try { await api.clientes.deletar(id); } catch { erros++; } }
+    toast(erros ? `${ids.length - erros} desativados, ${erros} com erro.` : `${ids.length} desativado(s).`,
+          erros ? 'error' : 'success');
+    cancelarSelecao();
+    aplicarFiltros();
+  }
+
+  // ── Desativar individual ─────────────────────────────────
+  async function desativar(id, nome) {
+    if (!confirm(`Desativar "${nome}"?`)) return;
+    try {
+      await api.clientes.deletar(id);
+      toast('Cliente desativado.');
+      fecharModal('modalPerfil');
+      aplicarFiltros();
+    } catch(e) { toast(e.message, 'error'); }
+  }
+
+  // ── Perfil ───────────────────────────────────────────────
+  async function verPerfil(id) {
+    abrirModal('modalPerfil');
+    document.getElementById('mpTitulo').textContent = 'Carregando…';
+    document.getElementById('mpBody').innerHTML = '<div style="text-align:center;padding:24px;color:#555">Carregando…</div>';
+    document.getElementById('btnAbrirEdicao').dataset.id = id;
+    try {
+      const d = await api.clientes.perfil(id);
+      const p = d.dados_pessoais;
+      _editId = id;
+      document.getElementById('mpTitulo').textContent = p.nome;
+      document.getElementById('btnAbrirEdicao').onclick = () => {
+        fecharModal('modalPerfil');
+        abrirEdicaoDirecta(id, p.nome, p.email || '', p.observacoes || '', p.foto || '');
+      };
+      document.getElementById('mpBody').innerHTML = `
+        <div class="mp-stat-grid">
+          <div class="mp-stat">
+            <div class="mp-stat-val">${d.total_visitas}</div>
+            <div class="mp-stat-lbl">Visitas</div>
+          </div>
+          <div class="mp-stat">
+            <div class="mp-stat-val" style="font-size:14px">${fmtR(d.total_gasto)}</div>
+            <div class="mp-stat-lbl">Total gasto</div>
+          </div>
+          <div class="mp-stat">
+            <div class="mp-stat-val" style="font-size:13px">${d.ultima_visita ? new Date(d.ultima_visita).toLocaleDateString('pt-BR') : '—'}</div>
+            <div class="mp-stat-lbl">Última visita</div>
+          </div>
+        </div>
+
+        <div class="mp-section">Contato</div>
+        <div class="mp-info-row">
+          <span style="color:#555">Telefone</span>
+          <span>${esc(p.telefone)}</span>
+        </div>
+        ${p.email ? `<div class="mp-info-row"><span style="color:#555">E-mail</span><span>${esc(p.email)}</span></div>` : ''}
+        ${d.servico_mais_feito ? `
+          <div class="mp-info-row">
+            <span style="color:#555">Serviço favorito</span>
+            <span style="color:var(--cor-primaria);font-weight:600">${esc(d.servico_mais_feito)}</span>
+          </div>` : ''}
+        ${p.observacoes ? `
+          <div style="background:#1e1e1e;border:1px solid #2d2d2d;border-radius:8px;padding:10px 12px;font-size:13px;color:#888;margin:10px 0">
+            📝 ${esc(p.observacoes)}
+          </div>` : ''}
+
+        ${d.historico.length ? `
+          <div class="mp-section">Últimas visitas</div>
+          <div class="mp-hist">
+            ${d.historico.map(h => `
+              <div class="mp-hist-row">
+                <div>
+                  <div style="font-weight:600;font-size:13px">${esc(h.servico)}</div>
+                  <div style="font-size:11px;color:#555">${new Date(h.data).toLocaleDateString('pt-BR')} · ${esc(h.barbeiro)}</div>
+                </div>
+                <div style="color:var(--cor-primaria);font-weight:700;font-size:13px">${fmtR(h.valor)}</div>
+              </div>`).join('')}
+          </div>` : ''}
+
+        <div style="margin-top:14px">
+          <button class="btn btn-ghost" style="width:100%;padding:9px;font-size:13px;border-color:rgba(220,38,38,.3);color:#f87171"
+                  onclick="desativar(${p.id},'${esc(p.nome).replace(/'/g,"\\'")}')">
+            Desativar cliente
+          </button>
+        </div>
+      `;
+    } catch(e) {
+      document.getElementById('mpBody').innerHTML = `<p style="color:#f87171;padding:16px">${esc(e.message)}</p>`;
+    }
+  }
+
+  // ── Edição ───────────────────────────────────────────────
+  function abrirEdicao() {
+    abrirModal('modalEdicao');
+  }
+  function abrirEdicaoDirecta(id, nome, email, obs, foto) {
+    _editId = id;
+    document.getElementById('eNome').value  = nome;
+    document.getElementById('eEmail').value = email;
+    document.getElementById('eObs').value   = obs;
+    uploadWidget.init('wFotoCliente', {
+      forma: 'circulo',
+      urlAtual: foto || null,
+      onUpload: async f => {
+        const r = await api.upload.cliente(id, f);
+        toast('Foto atualizada!', 'info');
+        return r.url;
+      },
+    });
+    abrirModal('modalEdicao');
+  }
+  async function salvarEdicao(e) {
+    e.preventDefault();
+    if (!_editId) return;
+    const btn = document.getElementById('btnSalvarEdicao');
+    btn.disabled = true; btn.textContent = 'Salvando…';
+    try {
+      await api.clientes.editar(_editId, {
+        nome:        document.getElementById('eNome').value.trim(),
+        email:       document.getElementById('eEmail').value.trim() || null,
+        observacoes: document.getElementById('eObs').value.trim() || null,
+      });
+      fecharModal('modalEdicao');
+      toast('Cliente atualizado!');
+      aplicarFiltros();
+    } catch(err) { toast(err.message, 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Salvar'; }
+  }
+
+  // ── CSV export ───────────────────────────────────────────
+  function exportarCSV() {
+    if (!_dados?.clientes?.length) { toast('Sem dados para exportar.', 'info'); return; }
+    const cols = ['Nome','Telefone','Email','Visitas','Total Gasto','Ticket Médio','Última Visita','Status','Desde'];
+    const rows = _dados.clientes.map(c => [
+      c.nome, c.telefone, c.email||'', c.total_visitas,
+      c.total_gasto, c.ticket_medio,
+      c.ultima_visita ? new Date(c.ultima_visita).toLocaleDateString('pt-BR') : '',
+      c.status,
+      c.criado_em ? new Date(c.criado_em).toLocaleDateString('pt-BR') : '',
+    ]);
+    const csv = [cols, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const url = URL.createObjectURL(new Blob(['﻿'+csv], {type:'text/csv;charset=utf-8;'}));
+    Object.assign(document.createElement('a'), {href: url, download: 'clientes.csv'}).click();
+    URL.revokeObjectURL(url);
+    toast('CSV exportado!', 'info');
+  }
+
+  // ── Init ─────────────────────────────────────────────────
+  (async () => {
+    try {
+      const barbs = await api.barbeiros.listar();
+      const sel = document.getElementById('fBarbeiro');
+      barbs.forEach(b => {
+        const o = document.createElement('option');
+        o.value = b.id; o.textContent = b.nome; sel.appendChild(o);
+      });
+    } catch {}
+    carregar();
+  })();
+</script>
+{% endblock %}

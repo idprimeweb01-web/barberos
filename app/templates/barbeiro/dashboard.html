@@ -1,0 +1,99 @@
+{% extends "barbeiro/base.html" %}
+{% block title %}Dashboard{% endblock %}
+
+{% block styles %}
+.db-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+.db-card { background: #242424; border: 1px solid #2d2d2d; border-radius: 12px; padding: 14px; }
+.db-label { font-size: 11px; color: #666; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 4px; }
+.db-value { font-size: 26px; font-weight: 800; color: var(--cor-primaria); line-height: 1.1; }
+.db-value.sm { font-size: 19px; }
+.db-sub { font-size: 11px; font-weight: 700; margin-top: 4px; }
+.db-sub.pos { color: #4ade80; }
+.db-sub.neg { color: #f87171; }
+.db-sub.neu { color: #555; }
+.chart-card { background: #242424; border: 1px solid #2d2d2d; border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+.chart-lbl  { font-size: 11px; color: #666; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 10px; }
+.db-loading { text-align: center; color: #444; padding: 32px; font-size: 13px; }
+{% endblock %}
+
+{% block content %}
+<div id="dbLoading" class="db-loading">Carregando…</div>
+<div id="dbConteudo" style="display:none">
+  <div class="db-grid" id="dbCards"></div>
+  <div class="chart-card">
+    <div class="chart-lbl">Faturamento — últimos 7 dias</div>
+    <canvas id="dbChart" height="130"></canvas>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+  function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function _pct(a, b) {
+    if (!b) return a > 0 ? {t:'+100%',c:'pos'} : {t:'—',c:'neu'};
+    const v = Math.round((a-b)/b*100);
+    return {t:(v>=0?'+':'')+v+'%', c:v>=0?'pos':'neg'};
+  }
+
+  function _card(label, value, sub, subClass) {
+    return `<div class="db-card">
+      <div class="db-label">${label}</div>
+      <div class="db-value ${value.length > 7 ? 'sm' : ''}">${value}</div>
+      <div class="db-sub ${subClass}">${sub}</div>
+    </div>`;
+  }
+
+  async function carregar() {
+    try {
+      const d = await api.barbeiro.dashboard();
+      const p1 = _pct(d.atendimentos_hoje,  d.atendimentos_ontem);
+      const p2 = _pct(d.faturamento_hoje,   d.faturamento_ontem);
+      const p = d.proximo_cliente;
+
+      document.getElementById('dbCards').innerHTML =
+        _card('Atendimentos hoje', String(d.atendimentos_hoje),
+              p1.t + ' vs ontem', p1.c) +
+        _card('Faturamento hoje',  `R$${d.faturamento_hoje.toFixed(2)}`,
+              p2.t + ' vs ontem', p2.c) +
+        _card('Taxa de ocupação', d.taxa_ocupacao + '%',
+              `${d.slots_ocupados}/${d.total_slots} slots`, 'neu') +
+        (p
+          ? _card('Próximo cliente', p.hora,
+                  esc(p.nome) + ' · ' + esc(p.servico), 'neu')
+          : _card('Próximo cliente', '—', 'Nenhum pendente', 'neu'));
+
+      // Chart
+      new Chart(document.getElementById('dbChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels:   d.receita_7dias.map(r => r.data.slice(5).replace('-','/')),
+          datasets: [{
+            data:            d.receita_7dias.map(r => r.receita),
+            backgroundColor: 'rgba(186,117,23,.35)',
+            borderColor:     '#BA7517', borderWidth: 2, borderRadius: 6,
+          }],
+        },
+        options: {
+          responsive: true,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { color: '#2a2a2a' }, ticks: { color: '#555', font: { size: 10 } } },
+            y: { grid: { color: '#2a2a2a' }, ticks: { color: '#555', callback: v => `R$${v}` }, beginAtZero: true },
+          },
+        },
+      });
+
+      document.getElementById('dbLoading').style.display  = 'none';
+      document.getElementById('dbConteudo').style.display = '';
+    } catch(e) {
+      document.getElementById('dbLoading').textContent = 'Erro: ' + e.message;
+    }
+  }
+
+  carregar();
+  setInterval(carregar, 60000);
+</script>
+{% endblock %}

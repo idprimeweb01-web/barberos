@@ -1,0 +1,197 @@
+{% extends "gestor/base.html" %}
+{% block title %}Produtos{% endblock %}
+{% block page_title %}Produtos{% endblock %}
+
+{% block content %}
+<div class="section-header">
+  <span class="section-title">Produtos</span>
+  <button class="btn btn-primary" style="width:auto;padding:9px 18px;font-size:14px" onclick="novoModal()">+ Produto</button>
+</div>
+
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr><th>Foto</th><th>Nome</th><th>Categoria</th><th>Preço</th><th>Estoque</th><th>Status</th><th>Ações</th></tr>
+    </thead>
+    <tbody id="tbody">
+      <tr><td colspan="7" style="text-align:center;color:#555;padding:32px">Carregando…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Modal criar/editar -->
+<div class="modal-overlay" id="modal" onclick="if(event.target===this)fecharModal('modal')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="modalTitulo">Novo Produto</h3>
+      <button class="modal-close" onclick="fecharModal('modal')">×</button>
+    </div>
+    <form id="form" onsubmit="salvar(event)">
+      <div class="field"><label>Nome *</label><input type="text" id="fNome" required></div>
+      <div class="field"><label>Categoria</label><input type="text" id="fCategoria" placeholder="ex: Pomadas, Óleos…"></div>
+      <div class="field"><label>Preço (R$) *</label><input type="number" id="fPreco" min="0" step="0.01" required></div>
+      <div class="field"><label>Estoque</label><input type="number" id="fEstoque" min="0" value="0"></div>
+      <div class="field"><label>Foto</label><div id="wFotoPd"></div></div>
+      <div class="field" id="wrAtivo" style="display:none">
+        <label class="toggle-label">
+          <input type="checkbox" id="fAtivo" checked>
+          <span class="toggle-track"></span>
+          Produto ativo
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" style="width:auto;padding:9px 18px" onclick="fecharModal('modal')">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btnSalvar" style="width:auto;padding:9px 24px">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal confirmar desativação -->
+<div class="modal-overlay" id="modalDel" onclick="if(event.target===this)fecharModal('modalDel')">
+  <div class="modal-box" style="max-width:420px">
+    <div class="modal-header">
+      <h3>Desativar produto</h3>
+      <button class="modal-close" onclick="fecharModal('modalDel')">×</button>
+    </div>
+    <p style="font-size:14px;color:#aaa;margin-bottom:20px">
+      Desativar <strong id="mDelNome"></strong>?
+      O produto não aparecerá mais para novos atendimentos.
+    </p>
+    <div class="modal-footer">
+      <button type="button" class="btn btn-ghost" style="width:auto;padding:9px 18px" onclick="fecharModal('modalDel')">Cancelar</button>
+      <button id="btnConfDel" style="width:auto;padding:9px 18px;background:rgba(220,38,38,.12);border:1px solid rgba(220,38,38,.35);color:#f87171;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;font-family:inherit"
+        onclick="confirmarDel()">Desativar</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let _todos = [];
+  let _editId = null;
+
+  async function carregar() {
+    try { _todos = await api.produtos.listar(); }
+    catch(e) { _todos = []; toast(e.message, 'error'); }
+    renderTabela();
+  }
+
+  function renderTabela() {
+    const tb = document.getElementById('tbody');
+    if (!_todos.length) {
+      tb.innerHTML = '<tr><td colspan="7"><div class="empty-state"><p>Nenhum produto cadastrado.</p></div></td></tr>';
+      return;
+    }
+    tb.innerHTML = _todos.map(p => `
+      <tr>
+        <td>${fotoEl(p.foto, p.nome)}</td>
+        <td style="font-weight:600">${esc(p.nome)}</td>
+        <td style="color:#888">${esc(p.categoria || '—')}</td>
+        <td>R$ ${p.preco.toFixed(2)}</td>
+        <td>${estoqueLabel(p.quantidade_estoque)}</td>
+        <td>${p.ativo ? '<span class="badge-green">Ativo</span>' : '<span class="badge-gray">Inativo</span>'}</td>
+        <td><div class="td-actions">
+          <button class="btn-icon" onclick="editarModal(${p.id})">Editar</button>
+          ${p.ativo ? `<button class="btn-icon danger" onclick="abrirDel(${p.id},'${esc(p.nome)}')">Remover</button>` : ''}
+        </div></td>
+      </tr>
+    `).join('');
+  }
+
+  function fotoEl(url, nome) {
+    if (url) return `<div class="foto-avatar"><img src="${url}" alt="${esc(nome)}"></div>`;
+    return `<div class="foto-avatar" style="border-radius:6px">📦</div>`;
+  }
+
+  function estoqueLabel(qtd) {
+    if (qtd === 0) return '<span class="badge-red">Zerado</span>';
+    if (qtd <= 3)  return `<span class="badge" style="background:rgba(234,179,8,.12);color:#fbbf24;border-radius:999px;padding:2px 9px;font-size:11px;font-weight:700">${qtd}</span>`;
+    return `<span style="color:#aaa">${qtd}</span>`;
+  }
+
+  function novoModal() {
+    _editId = null;
+    document.getElementById('modalTitulo').textContent = 'Novo Produto';
+    document.getElementById('form').reset();
+    document.getElementById('wrAtivo').style.display = 'none';
+    uploadWidget.init('wFotoPd', { forma: 'quadrado', urlAtual: null });
+    abrirModal('modal');
+  }
+
+  function editarModal(id) {
+    const p = _todos.find(x => x.id === id);
+    if (!p) return;
+    _editId = id;
+    document.getElementById('modalTitulo').textContent = 'Editar Produto';
+    document.getElementById('fNome').value      = p.nome;
+    document.getElementById('fCategoria').value = p.categoria || '';
+    document.getElementById('fPreco').value     = p.preco;
+    document.getElementById('fEstoque').value   = p.quantidade_estoque;
+    document.getElementById('fAtivo').checked   = p.ativo;
+    document.getElementById('wrAtivo').style.display = '';
+    uploadWidget.init('wFotoPd', {
+      forma: 'quadrado',
+      urlAtual: p.foto,
+      onUpload: async f => {
+        const r = await api.upload.produto(id, f);
+        toast('Foto atualizada!', 'info');
+        return r.url;
+      },
+    });
+    abrirModal('modal');
+  }
+
+  async function salvar(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnSalvar');
+    btn.disabled = true; btn.textContent = 'Salvando…';
+    const dados = {
+      nome:               document.getElementById('fNome').value.trim(),
+      categoria:          document.getElementById('fCategoria').value.trim(),
+      preco:              parseFloat(document.getElementById('fPreco').value),
+      quantidade_estoque: parseInt(document.getElementById('fEstoque').value) || 0,
+    };
+    if (_editId) dados.ativo = document.getElementById('fAtivo').checked;
+    try {
+      let res;
+      if (_editId) res = await api.produtos.editar(_editId, dados);
+      else         res = await api.produtos.criar(dados);
+
+      const fotoFile = uploadWidget.getFile('wFotoPd');
+      if (fotoFile) {
+        const pid = _editId || res.produto.id;
+        await api.upload.produto(pid, fotoFile).catch(e => toast('Foto: ' + e.message, 'error'));
+      }
+
+      fecharModal('modal');
+      toast(_editId ? 'Produto atualizado!' : 'Produto criado!');
+      await carregar();
+    } catch(err) { toast(err.message, 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Salvar'; }
+  }
+
+  let _delId = null;
+  function abrirDel(id, nome) {
+    _delId = id;
+    document.getElementById('mDelNome').textContent = nome;
+    abrirModal('modalDel');
+  }
+  async function confirmarDel() {
+    const btn = document.getElementById('btnConfDel');
+    btn.disabled = true; btn.textContent = '…';
+    try {
+      await api.produtos.deletar(_delId);
+      fecharModal('modalDel');
+      toast('Produto desativado.');
+      await carregar();
+    } catch(e) { toast(e.message, 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Desativar'; }
+  }
+
+  function esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  carregar();
+</script>
+{% endblock %}

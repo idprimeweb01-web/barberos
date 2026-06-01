@@ -1,0 +1,219 @@
+{% extends "super/base.html" %}
+{% block title %}Barbearias{% endblock %}
+{% block page_title %}Barbearias{% endblock %}
+
+{% block content %}
+<div class="section-header">
+  <span class="section-title">Barbearias</span>
+  <button class="btn btn-primary" style="width:auto;padding:9px 18px;font-size:14px" onclick="novoModal()">+ Barbearia</button>
+</div>
+
+<div class="table-wrap">
+  <table class="data-table">
+    <thead><tr><th>Logo</th><th>Nome</th><th>Slug</th><th>Gestor</th><th>Tema</th><th>Status</th><th>Ações</th></tr></thead>
+    <tbody id="tbody"><tr><td colspan="7" style="text-align:center;color:#444;padding:32px">Carregando…</td></tr></tbody>
+  </table>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal" onclick="if(event.target===this)fecharModal('modal')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="modalTitulo">Nova Barbearia</h3>
+      <button class="modal-close" onclick="fecharModal('modal')">×</button>
+    </div>
+    <form id="form" onsubmit="salvar(event)">
+      <div class="field"><label>Nome *</label><input type="text" id="fNome" required oninput="atualizarPreview()"></div>
+      <div class="field">
+        <label>Slug * <small style="color:#555">(somente letras minúsculas, números e -)</small></label>
+        <input type="text" id="fSlug" pattern="[a-z0-9-]+" required oninput="this.value=this.value.toLowerCase().replace(/[^a-z0-9-]/g,'')">
+      </div>
+      <div class="field">
+        <label>Nome para exibição <small style="color:#555">(aparece no painel — deixe vazio para usar o Nome)</small></label>
+        <input type="text" id="fNomeExib" placeholder="Ex: Cebo Barbearia" oninput="atualizarPreview()">
+      </div>
+      <div class="field"><label>Logo</label><div id="wLogo"></div></div>
+      <div class="field">
+        <label>URL de Agendamento <small style="color:#555">(caminho público para o cliente agendar)</small></label>
+        <input type="text" id="fUrlAg" placeholder="/b/{slug}/">
+      </div>
+      <div class="field">
+        <label>Fonte</label>
+        <select id="fFonte" onchange="atualizarPreview()" style="width:100%;padding:8px 12px;background:#1e1e1e;border:1.5px solid #333;border-radius:8px;color:#fff;font-family:inherit;font-size:13px;outline:none;cursor:pointer">
+          <option value="Inter">Inter (padrão)</option>
+          <option value="Arial">Arial</option>
+          <option value="Georgia">Georgia</option>
+          <option value="Roboto">Roboto</option>
+          <option value="Courier New">Courier New</option>
+          <option value="Verdana">Verdana</option>
+          <option value="Raleway">Raleway</option>
+        </select>
+      </div>
+      <fieldset style="border:1px solid #2d2d2d;border-radius:8px;padding:12px 16px;margin-bottom:16px">
+        <legend style="font-size:12px;color:#666;padding:0 6px">Tema de Cores</legend>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px">
+          <div class="field" style="margin:0">
+            <label style="font-size:12px">Cor primária</label>
+            <input type="color" id="fCorP" value="#BA7517" oninput="atualizarPreview()" style="width:100%;height:36px;padding:2px;border:1px solid #333;border-radius:6px;background:#1e1e1e;cursor:pointer">
+          </div>
+          <div class="field" style="margin:0">
+            <label style="font-size:12px">Fundo</label>
+            <input type="color" id="fCorF" value="#1a1a1a" oninput="atualizarPreview()" style="width:100%;height:36px;padding:2px;border:1px solid #333;border-radius:6px;background:#1e1e1e;cursor:pointer">
+          </div>
+          <div class="field" style="margin:0">
+            <label style="font-size:12px">Card</label>
+            <input type="color" id="fCorC" value="#2a2a2a" oninput="atualizarPreview()" style="width:100%;height:36px;padding:2px;border:1px solid #333;border-radius:6px;background:#1e1e1e;cursor:pointer">
+          </div>
+        </div>
+        <!-- Pré-visualização -->
+        <div style="font-size:10px;color:#555;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Pré-visualização</div>
+        <div style="display:flex;border-radius:8px;overflow:hidden;border:1px solid #333">
+          <div id="pvSidebar" style="background:#1f1f1f;padding:10px 12px;min-width:110px">
+            <div id="pvBrand" style="font-size:13px;font-weight:700;color:#BA7517;margin-bottom:8px">BarberOS</div>
+            <div id="pvNavItem" style="font-size:11px;padding:6px 8px;border-radius:5px;border-left:2px solid #BA7517;color:#BA7517;background:rgba(186,117,23,.1)">Dashboard</div>
+          </div>
+          <div id="pvMain" style="flex:1;background:#1a1a1a;padding:10px">
+            <div id="pvCard" style="background:#2a2a2a;border-radius:7px;padding:10px">
+              <div style="font-size:9px;color:#555;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px">FATURAMENTO</div>
+              <div id="pvValue" style="font-size:18px;font-weight:800;color:#BA7517">R$ 1.234</div>
+            </div>
+          </div>
+        </div>
+      </fieldset>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" style="width:auto;padding:9px 18px" onclick="fecharModal('modal')">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btnSalvar" style="width:auto;padding:9px 24px">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let _todos = [], _editId = null;
+
+  async function carregar() {
+    try { _todos = await api.super.barbearias.listar(); }
+    catch(e) { _todos = []; toast(e.message,'error'); }
+    renderTabela();
+  }
+
+  function renderTabela() {
+    const tb = document.getElementById('tbody');
+    if (!_todos.length) { tb.innerHTML='<tr><td colspan="7"><div class="empty-state">Nenhuma barbearia.</div></td></tr>'; return; }
+    tb.innerHTML = _todos.map(b => `<tr>
+      <td>${b.tema?.logo_url ? `<div class="foto-avatar"><img src="${b.tema.logo_url}" alt="${esc(b.nome)}"></div>` : `<div class="foto-avatar">${esc(b.nome.charAt(0))}</div>`}</td>
+      <td style="font-weight:600">${esc(b.nome)}</td>
+      <td><code style="font-size:12px;color:#BA7517;background:rgba(186,117,23,.1);padding:2px 7px;border-radius:4px">${esc(b.slug)}</code></td>
+      <td style="color:#777">${esc(b.gestor?.nome || '—')}</td>
+      <td><span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:${esc(b.tema?.cor_primaria||'#BA7517')};vertical-align:middle;margin-right:4px"></span>${esc(b.tema?.cor_primaria||'—')}</td>
+      <td>${b.ativo ? '<span class="badge-green">Ativa</span>' : '<span class="badge-gray">Inativa</span>'}</td>
+      <td><div class="td-actions">
+        <button class="btn-icon" onclick="editarModal(${b.id})">Editar</button>
+        <a href="/b/${b.slug}/" target="_blank" class="btn-icon" style="text-decoration:none">Ver</a>
+      </div></td>
+    </tr>`).join('');
+  }
+
+  function novoModal() {
+    _editId=null;
+    document.getElementById('modalTitulo').textContent='Nova Barbearia';
+    document.getElementById('form').reset();
+    document.getElementById('fCorP').value='#BA7517';
+    document.getElementById('fCorF').value='#1a1a1a';
+    document.getElementById('fCorC').value='#2a2a2a';
+    document.getElementById('fFonte').value='Inter';
+    uploadWidget.init('wLogo', { forma: 'quadrado', urlAtual: null });
+    atualizarPreview();
+    abrirModal('modal');
+  }
+
+  function editarModal(id) {
+    const b=_todos.find(x=>x.id===id); if(!b) return;
+    _editId=id;
+    document.getElementById('modalTitulo').textContent='Editar Barbearia';
+    document.getElementById('fNome').value     = b.nome;
+    document.getElementById('fSlug').value     = b.slug;
+    document.getElementById('fNomeExib').value = b.tema?.nome_exibicao === b.nome ? '' : (b.tema?.nome_exibicao || '');
+    document.getElementById('fUrlAg').value    = b.url_agendamento || `/b/${b.slug}/`;
+    document.getElementById('fCorP').value     = b.tema?.cor_primaria || '#BA7517';
+    document.getElementById('fCorF').value     = b.tema?.cor_fundo    || '#1a1a1a';
+    document.getElementById('fCorC').value     = b.tema?.cor_card     || '#2a2a2a';
+    document.getElementById('fFonte').value    = b.tema?.fonte        || 'Inter';
+    uploadWidget.init('wLogo', {
+      forma: 'quadrado',
+      urlAtual: b.tema?.logo_url || null,
+      onUpload: async f => {
+        const r = await api.upload.barbearia(id, f);
+        toast('Logo atualizada!', 'info');
+        return r.url;
+      },
+    });
+    atualizarPreview();
+    abrirModal('modal');
+  }
+
+  function atualizarPreview() {
+    const cp   = document.getElementById('fCorP').value;
+    const cf   = document.getElementById('fCorF').value;
+    const cc   = document.getElementById('fCorC').value;
+    const nome = document.getElementById('fNomeExib').value.trim() || document.getElementById('fNome').value.trim() || 'BarberOS';
+    const fonte = document.getElementById('fFonte').value || 'Inter';
+    const f = "'" + fonte + "', sans-serif";
+    document.getElementById('pvMain').style.background    = cf;
+    document.getElementById('pvCard').style.background    = cc;
+    document.getElementById('pvBrand').style.color        = cp;
+    document.getElementById('pvBrand').style.fontFamily   = f;
+    document.getElementById('pvBrand').textContent        = nome;
+    document.getElementById('pvNavItem').style.color      = cp;
+    document.getElementById('pvNavItem').style.borderLeftColor = cp;
+    document.getElementById('pvNavItem').style.background = cp + '22';
+    document.getElementById('pvValue').style.color        = cp;
+    document.getElementById('pvValue').style.fontFamily   = f;
+  }
+
+  async function salvar(e) {
+    e.preventDefault();
+    const btn=document.getElementById('btnSalvar');
+    btn.disabled=true; btn.textContent='Salvando…';
+    const dados={
+      nome: document.getElementById('fNome').value.trim(),
+      slug: document.getElementById('fSlug').value.trim(),
+      url_agendamento: document.getElementById('fUrlAg').value.trim() || null,
+      tema:{
+        nome_exibicao: document.getElementById('fNomeExib').value.trim() || null,
+        logo_url:     uploadWidget.getUrl('wLogo') || null,
+        cor_primaria: document.getElementById('fCorP').value,
+        cor_fundo:    document.getElementById('fCorF').value,
+        cor_card:     document.getElementById('fCorC').value,
+        fonte:        document.getElementById('fFonte').value,
+      },
+    };
+    try {
+      let resultado;
+      if(_editId) resultado = await api.super.barbearias.editar(_editId, dados);
+      else        resultado = await api.super.barbearias.criar(dados);
+
+      // Upload de logo pendente (criação)
+      const logoFile = uploadWidget.getFile('wLogo');
+      if (logoFile) {
+        const bid = _editId || resultado.barbearia?.id;
+        if (bid) {
+          try {
+            const r = await api.upload.barbearia(bid, logoFile);
+            uploadWidget.setUrl('wLogo', r.url);
+          } catch(e) { toast('Erro no upload da logo: ' + e.message, 'error'); }
+        }
+      }
+
+      fecharModal('modal');
+      toast(_editId?'Barbearia atualizada!':'Barbearia criada!');
+      await carregar();
+    } catch(err){ toast(err.message,'error'); }
+    finally{ btn.disabled=false; btn.textContent='Salvar'; }
+  }
+
+  carregar();
+</script>
+{% endblock %}

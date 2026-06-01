@@ -1,0 +1,213 @@
+{% extends "gestor/base.html" %}
+{% block title %}Barbeiros{% endblock %}
+{% block page_title %}Barbeiros{% endblock %}
+
+{% block content %}
+<div class="section-header">
+  <span class="section-title">Equipe</span>
+  <button class="btn btn-primary" style="width:auto;padding:9px 18px;font-size:14px" onclick="novoModal()">+ Barbeiro</button>
+</div>
+
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr>
+        <th>Foto</th><th>Nome</th><th>Email</th><th>Telefone</th>
+        <th>Comissão</th><th>Status</th><th>Ações</th>
+      </tr>
+    </thead>
+    <tbody id="tbody">
+      <tr><td colspan="7" style="text-align:center;color:#555;padding:32px">Carregando…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Modal criar/editar -->
+<div class="modal-overlay" id="modal" onclick="if(event.target===this)fecharModal('modal')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="modalTitulo">Novo Barbeiro</h3>
+      <button class="modal-close" onclick="fecharModal('modal')">×</button>
+    </div>
+    <form id="form" onsubmit="salvar(event)">
+      <div class="field"><label>Nome *</label><input type="text" id="fNome" required></div>
+      <div class="field"><label>E-mail</label><input type="email" id="fEmail"></div>
+      <div class="field"><label>Telefone *</label><input type="tel" id="fTelefone" required></div>
+      <div class="field" id="wrSenha"><label>Senha * (mín. 6 chars)</label><input type="password" id="fSenha" minlength="6"></div>
+      <div class="field"><label>Comissão (%)</label><input type="number" id="fComissao" min="0" max="100" step="0.5" value="0"></div>
+      <div class="field"><label>Bio</label><textarea id="fBio" rows="2" style="resize:vertical;padding:10px"></textarea></div>
+
+      <div class="field"><label>Foto</label><div id="wFotoBarb"></div></div>
+
+      <div class="field">
+        <label>Serviços que realiza</label>
+        <div class="check-list" id="servicosLista">
+          <span style="color:#555;font-size:13px">Carregando serviços…</span>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" style="width:auto;padding:9px 18px" onclick="fecharModal('modal')">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btnSalvar" style="width:auto;padding:9px 24px">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let _todos = [];
+  let _servicos = [];
+  let _editId = null;
+
+  // ── Carregar ────────────────────────────────────────────────
+  async function carregar() {
+    const [barbs, servs] = await Promise.all([
+      api.barbeiros.listar(),
+      api.servicos.listar(),
+    ]).catch(e => { toast(e.message, 'error'); return [[], []]; });
+    _todos    = barbs;
+    _servicos = servs;
+    renderTabela();
+    renderServicosCheck();
+  }
+
+  function renderTabela() {
+    const tb = document.getElementById('tbody');
+    if (!_todos.length) {
+      tb.innerHTML = '<tr><td colspan="7"><div class="empty-state"><p>Nenhum barbeiro cadastrado.</p></div></td></tr>';
+      return;
+    }
+    tb.innerHTML = _todos.map(b => `
+      <tr>
+        <td>${fotoEl(b.foto, b.nome)}</td>
+        <td style="font-weight:600">${esc(b.nome)}</td>
+        <td style="color:#888">${esc(b.email || '—')}</td>
+        <td>${esc(b.telefone)}</td>
+        <td>${b.comissao_percentual}%</td>
+        <td>${b.ativo ? '<span class="badge-green">Ativo</span>' : '<span class="badge-gray">Inativo</span>'}</td>
+        <td><div class="td-actions">
+          <button class="btn-icon" onclick="editarModal(${b.id})">Editar</button>
+          <button class="btn-icon danger" onclick="deletar(${b.id})">Remover</button>
+        </div></td>
+      </tr>
+    `).join('');
+  }
+
+  function fotoEl(url, nome) {
+    if (url) return `<div class="foto-avatar"><img src="${url}" alt="${esc(nome)}"></div>`;
+    return `<div class="foto-avatar">${esc(nome.charAt(0).toUpperCase())}</div>`;
+  }
+
+  function renderServicosCheck() {
+    const el = document.getElementById('servicosLista');
+    if (!_servicos.length) { el.innerHTML = '<span style="color:#555;font-size:13px">Nenhum serviço cadastrado.</span>'; return; }
+    el.innerHTML = _servicos.map(s => `
+      <label class="check-item">
+        <input type="checkbox" class="sv-check" value="${s.id}">
+        ${esc(s.nome)} — R$ ${s.preco.toFixed(2)}
+      </label>
+    `).join('');
+  }
+
+  // ── Abrir modal ─────────────────────────────────────────────
+  function novoModal() {
+    _editId = null;
+    document.getElementById('modalTitulo').textContent = 'Novo Barbeiro';
+    document.getElementById('form').reset();
+    document.getElementById('wrSenha').style.display = '';
+    document.getElementById('fSenha').required = true;
+    document.querySelectorAll('.sv-check').forEach(c => c.checked = false);
+    uploadWidget.init('wFotoBarb', { forma: 'circulo', urlAtual: null });
+    abrirModal('modal');
+  }
+
+  function editarModal(id) {
+    const b = _todos.find(x => x.id === id);
+    if (!b) return;
+    _editId = id;
+    document.getElementById('modalTitulo').textContent = 'Editar Barbeiro';
+    document.getElementById('fNome').value     = b.nome;
+    document.getElementById('fEmail').value    = b.email || '';
+    document.getElementById('fTelefone').value = b.telefone;
+    document.getElementById('fSenha').value    = '';
+    document.getElementById('fComissao').value = b.comissao_percentual;
+    document.getElementById('fBio').value      = b.bio || '';
+    document.getElementById('wrSenha').style.display = 'none';
+    document.getElementById('fSenha').required = false;
+    document.querySelectorAll('.sv-check').forEach(c => {
+      c.checked = b.servicos_ids.includes(parseInt(c.value));
+    });
+    uploadWidget.init('wFotoBarb', {
+      forma: 'circulo',
+      urlAtual: b.foto,
+      onUpload: async f => {
+        const r = await api.upload.barbeiro(id, f);
+        toast('Foto atualizada!', 'info');
+        return r.url;
+      },
+    });
+    abrirModal('modal');
+  }
+
+  // ── Salvar ──────────────────────────────────────────────────
+  async function salvar(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnSalvar');
+    btn.disabled = true; btn.textContent = 'Salvando…';
+
+    const servicos_ids = [...document.querySelectorAll('.sv-check:checked')].map(c => parseInt(c.value));
+    const dados = {
+      nome:                document.getElementById('fNome').value.trim(),
+      email:               document.getElementById('fEmail').value.trim(),
+      telefone:            document.getElementById('fTelefone').value.trim(),
+      comissao_percentual: parseFloat(document.getElementById('fComissao').value) || 0,
+      bio:                 document.getElementById('fBio').value.trim(),
+      servicos_ids,
+    };
+
+    try {
+      let resultado;
+      if (_editId) {
+        resultado = await api.barbeiros.editar(_editId, dados);
+      } else {
+        dados.senha = document.getElementById('fSenha').value;
+        resultado = await api.barbeiros.criar(dados);
+      }
+
+      // Upload foto pendente (nova criação — edição já é auto-upload)
+      const fotoFile = uploadWidget.getFile('wFotoBarb');
+      if (fotoFile) {
+        const bid = _editId || resultado.barbeiro.id;
+        await api.upload.barbeiro(bid, fotoFile).catch(e => toast('Erro: ' + e.message, 'error'));
+      }
+
+      fecharModal('modal');
+      toast(_editId ? 'Barbeiro atualizado!' : 'Barbeiro criado!');
+      await carregar();
+    } catch(err) {
+      toast(err.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Salvar';
+    }
+  }
+
+  // ── Deletar ─────────────────────────────────────────────────
+  async function deletar(id) {
+    const b = _todos.find(x => x.id === id);
+    if (!confirm(`Desativar o barbeiro "${b?.nome}"?`)) return;
+    try {
+      await api.barbeiros.deletar(id);
+      toast('Barbeiro desativado.');
+      await carregar();
+    } catch(e) { toast(e.message, 'error'); }
+  }
+
+  function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  carregar();
+</script>
+{% endblock %}

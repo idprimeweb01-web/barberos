@@ -1,0 +1,135 @@
+{% extends "gestor/base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block styles %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<div id="loading" style="color:#666;font-size:14px;padding:20px 0">Carregando métricas…</div>
+
+<!-- Métricas -->
+<div class="metrics-grid" id="metricsGrid" style="display:none">
+  <div class="metric-card">
+    <div class="metric-label">Barbeiros</div>
+    <div class="metric-value" id="mBarbeiros">—</div>
+    <div class="metric-sub">ativos</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">Serviços</div>
+    <div class="metric-value" id="mServicos">—</div>
+    <div class="metric-sub">ativos</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">Produtos</div>
+    <div class="metric-value" id="mProdutos">—</div>
+    <div class="metric-sub">em estoque</div>
+  </div>
+  <div class="metric-card">
+    <div class="metric-label">Agendamentos Hoje</div>
+    <div class="metric-value" id="mAgendamentos">—</div>
+    <div class="metric-sub">pendentes</div>
+  </div>
+</div>
+
+<!-- Solicitações de senha -->
+<div id="alertSenha" style="display:none;margin-bottom:20px">
+  <div class="alert alert-error" style="justify-content:space-between;align-items:center">
+    <span>
+      <strong id="alertSenhaQtd">0</strong> solicitação(ões) de redefinição de senha pendente(s).
+    </span>
+    <a href="/gestor/esqueci-senha" class="btn btn-secondary" style="width:auto;padding:8px 16px;font-size:13px;margin-left:16px">Ver solicitações</a>
+  </div>
+</div>
+
+<!-- Gráfico -->
+<div class="chart-wrap" id="chartWrap" style="display:none">
+  <div class="chart-title">Faturamento — últimos 7 dias</div>
+  <canvas id="chartReceita" height="100"></canvas>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let chart;
+
+  function fmtData(iso) {
+    const [,m,d] = iso.split('-');
+    return `${d}/${m}`;
+  }
+
+  async function carregar() {
+    try {
+      const d = await api.metricas();
+      document.getElementById('loading').style.display = 'none';
+
+      // Métricas
+      document.getElementById('mBarbeiros').textContent   = d.total_barbeiros;
+      document.getElementById('mServicos').textContent    = d.total_servicos;
+      document.getElementById('mProdutos').textContent    = d.total_produtos;
+      document.getElementById('mAgendamentos').textContent = d.agendamentos_hoje;
+      document.getElementById('metricsGrid').style.display = '';
+
+      // Badge sidebar
+      if (d.sol_pendentes > 0) {
+        const b = document.getElementById('sidebar-badge');
+        b.textContent = d.sol_pendentes; b.style.display = '';
+      }
+
+      // Alerta senha
+      if (d.sol_pendentes > 0) {
+        document.getElementById('alertSenhaQtd').textContent = d.sol_pendentes;
+        document.getElementById('alertSenha').style.display = '';
+      }
+
+      // Gráfico
+      document.getElementById('chartWrap').style.display = '';
+      const labels  = d.receita_7dias.map(r => fmtData(r.data));
+      const valores = d.receita_7dias.map(r => r.receita);
+
+      const ctx = document.getElementById('chartReceita').getContext('2d');
+      chart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Receita (R$)',
+            data: valores,
+            backgroundColor: 'rgba(186,117,23,.35)',
+            borderColor: '#BA7517',
+            borderWidth: 2,
+            borderRadius: 6,
+          }],
+        },
+        options: {
+          responsive: true,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx => `R$ ${ctx.parsed.y.toFixed(2)}`,
+              },
+            },
+          },
+          scales: {
+            x: { grid: { color: '#2d2d2d' }, ticks: { color: '#777' } },
+            y: {
+              grid: { color: '#2d2d2d' }, ticks: { color: '#777' },
+              beginAtZero: true,
+              ticks: {
+                callback: v => `R$${v}`,
+                color: '#777',
+              },
+            },
+          },
+        },
+      });
+    } catch(e) {
+      document.getElementById('loading').textContent = 'Erro ao carregar: ' + e.message;
+    }
+  }
+
+  carregar();
+</script>
+{% endblock %}

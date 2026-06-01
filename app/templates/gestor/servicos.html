@@ -1,0 +1,162 @@
+{% extends "gestor/base.html" %}
+{% block title %}Serviços{% endblock %}
+{% block page_title %}Serviços{% endblock %}
+
+{% block content %}
+<div class="section-header">
+  <span class="section-title">Serviços</span>
+  <button class="btn btn-primary" style="width:auto;padding:9px 18px;font-size:14px" onclick="novoModal()">+ Serviço</button>
+</div>
+
+<div class="table-wrap">
+  <table class="data-table">
+    <thead>
+      <tr><th>Nome</th><th>Descrição</th><th>Duração</th><th>Preço</th><th>Status</th><th>Ações</th></tr>
+    </thead>
+    <tbody id="tbody">
+      <tr><td colspan="6" style="text-align:center;color:#555;padding:32px">Carregando…</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modal" onclick="if(event.target===this)fecharModal('modal')">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h3 id="modalTitulo">Novo Serviço</h3>
+      <button class="modal-close" onclick="fecharModal('modal')">×</button>
+    </div>
+    <form id="form" onsubmit="salvar(event)">
+      <div class="field"><label>Nome *</label><input type="text" id="fNome" required></div>
+      <div class="field"><label>Descrição</label><textarea id="fDesc" rows="2" style="resize:vertical;padding:10px"></textarea></div>
+      <div class="field"><label>Duração (minutos) *</label><input type="number" id="fDuracao" min="5" required></div>
+      <div class="field"><label>Preço (R$) *</label><input type="number" id="fPreco" min="0" step="0.01" required></div>
+      <div class="field"><label>Foto</label><div id="wFotoSv"></div></div>
+      <div class="field" id="wrAtivo" style="display:none">
+        <label class="toggle-label">
+          <input type="checkbox" id="fAtivo" checked>
+          <span class="toggle-track"></span>
+          Serviço ativo
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" style="width:auto;padding:9px 18px" onclick="fecharModal('modal')">Cancelar</button>
+        <button type="submit" class="btn btn-primary" id="btnSalvar" style="width:auto;padding:9px 24px">Salvar</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  let _todos = [];
+  let _editId = null;
+
+  async function carregar() {
+    try {
+      _todos = await api.servicos.listar();
+    } catch(e) {
+      _todos = [];
+      toast(e.message, 'error');
+    }
+    renderTabela();
+  }
+
+  function renderTabela() {
+    const tb = document.getElementById('tbody');
+    if (!_todos.length) {
+      tb.innerHTML = '<tr><td colspan="6"><div class="empty-state"><p>Nenhum serviço cadastrado.</p></div></td></tr>';
+      return;
+    }
+    tb.innerHTML = _todos.map(s => `
+      <tr>
+        <td style="font-weight:600">${esc(s.nome)}</td>
+        <td style="color:#888;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(s.descricao || '—')}</td>
+        <td>${s.duracao_minutos} min</td>
+        <td>R$ ${s.preco.toFixed(2)}</td>
+        <td>${s.ativo ? '<span class="badge-green">Ativo</span>' : '<span class="badge-gray">Inativo</span>'}</td>
+        <td><div class="td-actions">
+          <button class="btn-icon" onclick="editarModal(${s.id})">Editar</button>
+          <button class="btn-icon danger" onclick="deletar(${s.id})">Remover</button>
+        </div></td>
+      </tr>
+    `).join('');
+  }
+
+  function novoModal() {
+    _editId = null;
+    document.getElementById('modalTitulo').textContent = 'Novo Serviço';
+    document.getElementById('form').reset();
+    document.getElementById('wrAtivo').style.display = 'none';
+    uploadWidget.init('wFotoSv', { forma: 'quadrado', urlAtual: null });
+    abrirModal('modal');
+  }
+
+  function editarModal(id) {
+    const s = _todos.find(x => x.id === id);
+    if (!s) return;
+    _editId = id;
+    document.getElementById('modalTitulo').textContent = 'Editar Serviço';
+    document.getElementById('fNome').value    = s.nome;
+    document.getElementById('fDesc').value    = s.descricao || '';
+    document.getElementById('fDuracao').value = s.duracao_minutos;
+    document.getElementById('fPreco').value   = s.preco;
+    document.getElementById('fAtivo').checked = s.ativo;
+    document.getElementById('wrAtivo').style.display = '';
+    uploadWidget.init('wFotoSv', {
+      forma: 'quadrado',
+      urlAtual: s.foto,
+      onUpload: async f => {
+        const r = await api.upload.servico(id, f);
+        toast('Foto atualizada!', 'info');
+        return r.url;
+      },
+    });
+    abrirModal('modal');
+  }
+
+  async function salvar(e) {
+    e.preventDefault();
+    const btn = document.getElementById('btnSalvar');
+    btn.disabled = true; btn.textContent = 'Salvando…';
+    const dados = {
+      nome:             document.getElementById('fNome').value.trim(),
+      descricao:        document.getElementById('fDesc').value.trim(),
+      duracao_minutos:  parseInt(document.getElementById('fDuracao').value),
+      preco:            parseFloat(document.getElementById('fPreco').value),
+    };
+    if (_editId) dados.ativo = document.getElementById('fAtivo').checked;
+    try {
+      let res;
+      if (_editId) res = await api.servicos.editar(_editId, dados);
+      else         res = await api.servicos.criar(dados);
+
+      const fotoFile = uploadWidget.getFile('wFotoSv');
+      if (fotoFile) {
+        const sid = _editId || res.servico?.id;
+        if (sid) await api.upload.servico(sid, fotoFile).catch(e => toast('Erro: ' + e.message, 'error'));
+      }
+
+      fecharModal('modal');
+      toast(_editId ? 'Serviço atualizado!' : 'Serviço criado!');
+      await carregar();
+    } catch(err) { toast(err.message, 'error'); }
+    finally { btn.disabled = false; btn.textContent = 'Salvar'; }
+  }
+
+  async function deletar(id) {
+    const s = _todos.find(x => x.id === id);
+    if (!confirm(`Desativar "${s?.nome}"?`)) return;
+    try {
+      await api.servicos.deletar(id);
+      toast('Serviço desativado.');
+      await carregar();
+    } catch(e) { toast(e.message, 'error'); }
+  }
+
+  function esc(s) { return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  carregar();
+</script>
+{% endblock %}

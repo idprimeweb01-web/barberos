@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BarberOS — {% block title %}Painel{% endblock %}</title>
+  <link rel="stylesheet" href="/static/css/style.css">
+  <script>
+    (function(){try{var t=JSON.parse(localStorage.getItem('barberos_barbearia_tema'));if(t){var r=document.documentElement.style;if(t.cor_primaria)r.setProperty('--cor-primaria',t.cor_primaria);if(t.cor_fundo)r.setProperty('--cor-fundo',t.cor_fundo);if(t.cor_card)r.setProperty('--cor-card',t.cor_card);if(t.fonte)r.setProperty('--fonte',"'"+t.fonte+"', sans-serif");}}catch(e){}}());
+  </script>
+  {% block styles %}{% endblock %}
+  <style>
+    /* ── Shell ──────────────────────────────────────────────── */
+    body { display: flex; margin: 0; }
+    .app-shell { display: flex; width: 100%; min-height: 100vh; }
+
+    /* ── Sidebar ─────────────────────────────────────────────── */
+    .sidebar {
+      width: 230px; flex-shrink: 0;
+      background: #1f1f1f; border-right: 1px solid #2d2d2d;
+      display: flex; flex-direction: column;
+      position: fixed; left: 0; top: 0; height: 100vh;
+      z-index: 200; transition: transform .25s;
+    }
+    .sidebar-brand {
+      padding: 20px 20px 16px;
+      font-size: 20px; font-weight: 700;
+      border-bottom: 1px solid #2d2d2d;
+    }
+    .sidebar-brand a { color: #fff; text-decoration: none; }
+    .sidebar-brand span { color: var(--cor-primaria); }
+    .sidebar-nav { flex: 1; padding: 8px 0; overflow-y: auto; }
+    .nav-link {
+      display: flex; align-items: center; gap: 10px;
+      padding: 11px 20px; color: #888; text-decoration: none;
+      font-size: 14px; font-weight: 500;
+      border-left: 3px solid transparent;
+      transition: all .15s;
+    }
+    .nav-link:hover { color: #ddd; background: rgba(255,255,255,.04); }
+    .nav-link.active { color: var(--cor-primaria); background: rgba(186,117,23,.1); border-left-color: var(--cor-primaria); }
+    .nav-link svg { flex-shrink: 0; }
+    .nav-section { padding: 16px 20px 4px; font-size: 10px; font-weight: 700; color: #555; letter-spacing: 1px; text-transform: uppercase; }
+    .sidebar-footer {
+      padding: 14px 16px; border-top: 1px solid #2d2d2d;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .user-avatar {
+      width: 34px; height: 34px; border-radius: 50%;
+      background: rgba(186,117,23,.2); border: 1.5px solid rgba(186,117,23,.4);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 700; color: var(--cor-primaria);
+      flex-shrink: 0;
+    }
+    .sidebar-user-info { flex: 1; min-width: 0; }
+    .sidebar-user-name { font-size: 13px; font-weight: 600; color: #ddd; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sidebar-user-role { font-size: 11px; color: #666; }
+    .btn-logout {
+      background: none; border: none; color: #555; cursor: pointer;
+      padding: 4px; transition: color .15s; border-radius: 6px;
+      display: flex; align-items: center;
+    }
+    .btn-logout:hover { color: #dc2626; }
+
+    /* ── Main area ───────────────────────────────────────────── */
+    .app-main { margin-left: 230px; flex: 1; display: flex; flex-direction: column; min-height: 100vh; }
+    .app-header {
+      height: 56px; background: #1f1f1f; border-bottom: 1px solid #2d2d2d;
+      padding: 0 16px 0 20px; display: flex; align-items: center; gap: 10px;
+      position: sticky; top: 0; z-index: 100;
+    }
+    .hamburger { display: none; background: none; border: none; color: #888; cursor: pointer; padding: 4px; align-items: center; flex-shrink: 0; }
+    .hamburger:hover { color: #ccc; }
+    .page-title { font-size: 16px; font-weight: 600; flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Status toggle */
+    .hdr-status {
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.25);
+      border-radius: 20px; padding: 5px 12px;
+      font-size: 11px; font-weight: 800; letter-spacing: .3px;
+      color: #4ade80; cursor: pointer; font-family: inherit;
+      transition: all .2s; white-space: nowrap; flex-shrink: 0;
+    }
+    .hdr-status.fechado { background: rgba(220,38,38,.1); border-color: rgba(220,38,38,.3); color: #f87171; }
+    .hdr-status:disabled { opacity: .6; cursor: wait; }
+    .hdr-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: currentColor; flex-shrink: 0;
+      animation: hdr-pulse 2s infinite;
+    }
+    .hdr-status.fechado .hdr-dot { animation: none; opacity: .8; }
+    @keyframes hdr-pulse { 0%,100% { opacity:1; } 50% { opacity:.35; } }
+
+    /* Header right items */
+    .hdr-username {
+      font-size: 12px; color: #666; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis; max-width: 110px; flex-shrink: 1;
+    }
+    .hdr-logout {
+      background: none; border: none; color: #555; cursor: pointer;
+      padding: 6px; border-radius: 6px; display: flex; align-items: center;
+      transition: color .15s; flex-shrink: 0;
+    }
+    .hdr-logout:hover { color: #dc2626; }
+
+    .app-content { flex: 1; padding: 24px; }
+
+    /* ── Booking banner ─────────────────────────────────────── */
+    .bk-bar {
+      background: rgba(186,117,23,.06); border-bottom: 1px solid rgba(186,117,23,.12);
+      padding: 6px 24px; display: flex; align-items: center; gap: 10px;
+    }
+    .bk-label { font-size: 11px; color: #666; font-weight: 600; white-space: nowrap; }
+    .bk-link  { font-size: 12px; font-weight: 700; color: var(--cor-primaria); text-decoration: none; }
+    .bk-link:hover { text-decoration: underline; }
+    .bk-copy  {
+      background: none; border: 1px solid rgba(186,117,23,.3); color: var(--cor-primaria);
+      border-radius: 6px; padding: 2px 8px; font-size: 10px; font-weight: 700;
+      cursor: pointer; font-family: inherit;
+    }
+    .bk-copy:hover { background: rgba(186,117,23,.1); }
+
+    /* ── Page section ────────────────────────────────────────── */
+    .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .section-title { font-size: 18px; font-weight: 700; }
+
+    /* ── Cards grid ──────────────────────────────────────────── */
+    .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px,1fr)); gap: 14px; margin-bottom: 24px; }
+    .metric-card {
+      background: #242424; border: 1px solid #2d2d2d; border-radius: 10px;
+      padding: 18px 20px; display: flex; flex-direction: column; gap: 6px;
+    }
+    .metric-label { font-size: 12px; color: #777; font-weight: 500; text-transform: uppercase; letter-spacing: .4px; }
+    .metric-value { font-size: 30px; font-weight: 700; color: var(--cor-primaria); line-height: 1; }
+    .metric-sub   { font-size: 12px; color: #555; }
+
+    /* ── Table ───────────────────────────────────────────────── */
+    .table-wrap { background: #242424; border: 1px solid #2d2d2d; border-radius: 10px; overflow: hidden; }
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table th {
+      padding: 11px 16px; text-align: left; font-size: 11px; font-weight: 700;
+      color: #666; text-transform: uppercase; letter-spacing: .5px;
+      background: #1e1e1e; border-bottom: 1px solid #2d2d2d;
+    }
+    .data-table td { padding: 12px 16px; font-size: 14px; border-bottom: 1px solid #252525; vertical-align: middle; }
+    .data-table tbody tr:last-child td { border-bottom: none; }
+    .data-table tbody tr:hover { background: rgba(255,255,255,.02); }
+    .td-actions { display: flex; gap: 6px; }
+
+    /* ── Foto / Avatar ───────────────────────────────────────── */
+    .foto-avatar {
+      width: 34px; height: 34px; border-radius: 50%; object-fit: cover;
+      background: #333; display: inline-flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 600; color: #777; overflow: hidden; flex-shrink: 0;
+    }
+    .foto-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+
+    /* ── Badges ──────────────────────────────────────────────── */
+    .badge-red  { background: rgba(220,38,38,.15); color: #f87171; border-radius: 999px; padding: 2px 9px; font-size: 11px; font-weight: 700; }
+    .badge-green{ background: rgba(34,197,94,.12);  color: #4ade80; border-radius: 999px; padding: 2px 9px; font-size: 11px; font-weight: 700; }
+    .badge-gray { background: rgba(255,255,255,.07);color: #777;    border-radius: 999px; padding: 2px 9px; font-size: 11px; font-weight: 700; }
+    .badge-num  { background: #dc2626; color: #fff; border-radius: 999px; padding: 1px 7px; font-size: 11px; font-weight: 800; display: inline-block; }
+
+    /* ── Action buttons ──────────────────────────────────────── */
+    .btn-icon {
+      background: none; border: 1px solid #333; color: #888; border-radius: 7px;
+      padding: 5px 10px; cursor: pointer; font-size: 12px; font-family: inherit;
+      transition: all .15s; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .btn-icon:hover { border-color: var(--cor-primaria); color: var(--cor-primaria); }
+    .btn-icon.danger:hover { border-color: #dc2626; color: #dc2626; }
+
+    /* ── Modal ───────────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.65);
+      display: none; align-items: center; justify-content: center;
+      z-index: 1000; padding: 20px;
+    }
+    .modal-overlay.visible { display: flex; }
+    .modal-box {
+      background: #242424; border: 1px solid #333; border-radius: 12px;
+      padding: 24px; width: 100%; max-width: 480px;
+      max-height: 90vh; overflow-y: auto;
+    }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .modal-header h3 { font-size: 15px; font-weight: 700; }
+    .modal-close { background: none; border: none; color: #666; font-size: 22px; cursor: pointer; line-height: 1; padding: 0; }
+    .modal-close:hover { color: #fff; }
+    .modal-footer { margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end; }
+
+    /* ── Toggle switch ───────────────────────────────────────── */
+    .toggle-label { display: flex; align-items: center; gap: 10px; cursor: pointer; font-size: 14px; color: #ccc; }
+    .toggle-label input[type=checkbox] { display: none; }
+    .toggle-track {
+      width: 40px; height: 22px; background: #444; border-radius: 22px;
+      position: relative; transition: background .2s; flex-shrink: 0;
+    }
+    .toggle-track::after {
+      content: ''; position: absolute; top: 3px; left: 3px;
+      width: 16px; height: 16px; background: #fff; border-radius: 50%;
+      transition: transform .2s;
+    }
+    .toggle-label input:checked + .toggle-track { background: var(--cor-primaria); }
+    .toggle-label input:checked + .toggle-track::after { transform: translateX(18px); }
+
+    /* ── Checkboxes list ─────────────────────────────────────── */
+    .check-list { display: flex; flex-direction: column; gap: 8px; max-height: 180px; overflow-y: auto; padding: 4px 0; }
+    .check-item { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #ccc; cursor: pointer; }
+    .check-item input[type=checkbox] { accent-color: var(--cor-primaria); width: 16px; height: 16px; cursor: pointer; }
+
+    /* ── Toast ───────────────────────────────────────────────── */
+    #toasts { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 8px; z-index: 9999; }
+    .toast {
+      padding: 12px 16px; border-radius: 8px; font-size: 14px; font-weight: 500;
+      min-width: 220px; box-shadow: 0 4px 16px rgba(0,0,0,.4);
+      animation: tIn .2s ease; pointer-events: none;
+    }
+    .toast.t-success { background: #14532d; border: 1px solid #16a34a; color: #bbf7d0; }
+    .toast.t-error   { background: #7f1d1d; border: 1px solid #dc2626; color: #fecaca; }
+    .toast.t-info    { background: rgba(186,117,23,.15); border: 1px solid #BA7517; color: #fbbf24; }
+    @keyframes tIn  { from { transform: translateX(110%); opacity:0; } to { transform: translateX(0); opacity:1; } }
+    @keyframes tOut { to   { transform: translateX(110%); opacity:0; } }
+    .toast.out { animation: tOut .2s ease forwards; }
+
+    /* ── Cards para agenda ───────────────────────────────────── */
+    .agenda-card { background: #242424; border: 1px solid #2d2d2d; border-radius: 10px; padding: 20px; margin-bottom: 14px; }
+    .agenda-card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+    .agenda-card-name   { font-size: 15px; font-weight: 600; }
+    .agenda-form-row    { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .agenda-form-row-3  { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .agenda-actions     { display: flex; gap: 8px; margin-top: 14px; }
+
+    /* ── Tabs ────────────────────────────────────────────────── */
+    .tabs { display: flex; gap: 4px; margin-bottom: 16px; background: #1e1e1e; border: 1px solid #2d2d2d; border-radius: 8px; padding: 4px; width: fit-content; }
+    .tab { padding: 7px 18px; border-radius: 6px; border: none; background: none; color: #777; font-size: 13px; font-weight: 600; cursor: pointer; font-family: inherit; transition: all .15s; }
+    .tab.active { background: var(--cor-primaria); color: #fff; }
+
+    /* ── Empty state ─────────────────────────────────────────── */
+    .empty-state { text-align: center; padding: 48px 20px; color: #555; }
+    .empty-state svg { margin-bottom: 12px; opacity: .4; }
+    .empty-state p   { font-size: 14px; }
+
+    /* ── Chart container ─────────────────────────────────────── */
+    .chart-wrap { background: #242424; border: 1px solid #2d2d2d; border-radius: 10px; padding: 20px; }
+    .chart-title { font-size: 14px; font-weight: 600; color: #aaa; margin-bottom: 14px; }
+
+    /* ── Responsive ──────────────────────────────────────────── */
+    @media (max-width: 768px) {
+      .sidebar { transform: translateX(-100%); }
+      .sidebar.open { transform: none; box-shadow: 4px 0 24px rgba(0,0,0,.5); }
+      .app-main { margin-left: 0; }
+      .hamburger { display: flex; }
+      .sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 199; display: none; }
+      .sidebar-overlay.visible { display: block; }
+      .metrics-grid { grid-template-columns: 1fr 1fr; }
+      .agenda-form-row, .agenda-form-row-3 { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 480px) {
+      .app-content { padding: 16px 12px; }
+      .app-header { padding: 0 10px 0 12px; gap: 7px; }
+      .metrics-grid { grid-template-columns: 1fr; }
+      .section-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+      .table-wrap { overflow-x: auto; }
+      .bk-bar { flex-wrap: wrap; padding: 8px 12px; gap: 6px; }
+      #hdrStatusLabel { display: none; }
+      .hdr-status { padding: 5px 8px; }
+      .hdr-username { display: none; }
+    }
+  </style>
+</head>
+<body>
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<div class="app-shell">
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-brand">
+      <a href="/gestor/dashboard" id="sidebarBrand">BarberOS</a>
+    </div>
+    <nav class="sidebar-nav">
+      <a href="/gestor/dashboard" class="nav-link" data-path="/gestor/dashboard">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        Dashboard
+      </a>
+      <a href="/gestor/barbeiros" class="nav-link" data-path="/gestor/barbeiros">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Barbeiros
+      </a>
+      <a href="/gestor/servicos" class="nav-link" data-path="/gestor/servicos">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m14.5 2.5-9 9"/><path d="m7.5 4.5 7 7"/><path d="m2 22 6-2 10-10-4-4L4 16l-2 6z"/></svg>
+        Serviços
+      </a>
+      <a href="/gestor/produtos" class="nav-link" data-path="/gestor/produtos">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+        Produtos
+      </a>
+      <a href="/gestor/agenda" class="nav-link" data-path="/gestor/agenda">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        Agenda
+      </a>
+      <a href="/gestor/clientes" class="nav-link" data-path="/gestor/clientes">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        Clientes
+      </a>
+      <a href="/gestor/relatorios" class="nav-link" data-path="/gestor/relatorios">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Relatórios
+      </a>
+      <a href="/gestor/esqueci-senha" class="nav-link" data-path="/gestor/esqueci-senha" id="nav-senha">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        Redefinições
+        <span class="badge-num" id="sidebar-badge" style="display:none;margin-left:auto">0</span>
+      </a>
+    </nav>
+  </aside>
+
+  <!-- Main -->
+  <div class="app-main">
+    <header class="app-header">
+      <button class="hamburger" onclick="toggleSidebar()">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <span class="page-title">{% block page_title %}Painel{% endblock %}</span>
+      <!-- Status da barbearia -->
+      <button class="hdr-status" id="hdrStatus" onclick="toggleStatus()" title="Clique para abrir/fechar a barbearia">
+        <span class="hdr-dot"></span>
+        <span id="hdrStatusLabel">ABERTO</span>
+      </button>
+      <!-- Usuário + logout -->
+      <span class="hdr-username" id="headerName"></span>
+      <button class="hdr-logout" onclick="api.logout()" title="Sair">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      </button>
+    </header>
+
+    <div class="bk-bar" id="bkBar" style="display:none">
+      <span class="bk-label">📅 Link de Agendamento:</span>
+      <a class="bk-link" id="bkLink" href="#" target="_blank">—</a>
+      <button class="bk-copy" onclick="copiarLinkBk()" title="Copiar">Copiar</button>
+    </div>
+    <main class="app-content">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script src="/static/js/api.js"></script>
+<script src="/static/js/upload-widget.js"></script>
+<script>
+  // ── Auth guard ─────────────────────────────────────────────
+  (function() {
+    const u = api.getUser();
+    if (!u || !api.getToken()) { window.location.href = '/login'; return; }
+    if (!['gestor','super_admin'].includes(u.perfil)) { window.location.href = '/login'; return; }
+    document.getElementById('headerName').textContent = u.nome || 'Usuário';
+  })();
+
+  // ── Active nav ─────────────────────────────────────────────
+  document.querySelectorAll('.nav-link[data-path]').forEach(a => {
+    if (window.location.pathname === a.dataset.path) a.classList.add('active');
+  });
+
+  // ── Toast ──────────────────────────────────────────────────
+  function toast(msg, tipo = 'success') {
+    const d = document.createElement('div');
+    d.className = `toast t-${tipo}`;
+    d.textContent = msg;
+    document.getElementById('toasts').appendChild(d);
+    setTimeout(() => d.classList.add('out'), 2600);
+    setTimeout(() => d.remove(), 2900);
+  }
+
+  // ── Modal ──────────────────────────────────────────────────
+  function abrirModal(id)  { document.getElementById(id).classList.add('visible'); }
+  function fecharModal(id) { document.getElementById(id).classList.remove('visible'); }
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') document.querySelectorAll('.modal-overlay.visible').forEach(m => m.classList.remove('visible'));
+  });
+
+  // ── Sidebar mobile ─────────────────────────────────────────
+  function toggleSidebar() {
+    document.getElementById('sidebar').classList.toggle('open');
+    document.getElementById('sidebarOverlay').classList.toggle('visible');
+  }
+  function closeSidebar() {
+    document.getElementById('sidebar').classList.remove('open');
+    document.getElementById('sidebarOverlay').classList.remove('visible');
+  }
+  document.querySelectorAll('.sidebar .nav-link').forEach(a => {
+    a.addEventListener('click', () => { if (window.innerWidth <= 768) closeSidebar(); });
+  });
+
+  // ── Status da barbearia (toggle header) ───────────────────
+  let _statusAberta = true;
+
+  async function carregarStatus() {
+    try {
+      const d = await api.barbearia.status();
+      _statusAberta = d.aberta;
+      _renderStatus();
+    } catch {}
+  }
+
+  function _renderStatus() {
+    const btn = document.getElementById('hdrStatus');
+    const lbl = document.getElementById('hdrStatusLabel');
+    if (_statusAberta) {
+      btn.classList.remove('fechado');
+      lbl.textContent = 'ABERTO';
+    } else {
+      btn.classList.add('fechado');
+      lbl.textContent = 'FECHADO';
+    }
+  }
+
+  async function toggleStatus() {
+    const novo = !_statusAberta;
+    const btn  = document.getElementById('hdrStatus');
+    btn.disabled = true;
+    try {
+      await api.barbearia.setStatus(novo);
+      _statusAberta = novo;
+      _renderStatus();
+      toast(novo ? '🟢 Barbearia marcada como ABERTA' : '🔴 Barbearia marcada como FECHADA', novo ? 'success' : 'info');
+    } catch(e) { toast(e.message, 'error'); }
+    finally { btn.disabled = false; }
+  }
+
+  carregarStatus();
+
+  // ── Carrega badge de solicitações pendentes ────────────────
+  async function carregarBadge() {
+    try {
+      const d = await api.metricas();
+      const n = d.sol_pendentes || 0;
+      const b = document.getElementById('sidebar-badge');
+      if (n > 0) { b.textContent = n; b.style.display = ''; }
+    } catch {}
+  }
+  carregarBadge();
+
+  // ── Tema da barbearia ──────────────────────────────────────
+  (async function() {
+    const KEY = 'barberos_barbearia_tema';
+    function _applyTheme(t) {
+      const r = document.documentElement.style;
+      if (t.cor_primaria) r.setProperty('--cor-primaria', t.cor_primaria);
+      if (t.cor_fundo)    r.setProperty('--cor-fundo',    t.cor_fundo);
+      if (t.cor_card)     r.setProperty('--cor-card',     t.cor_card);
+      if (t.fonte)        r.setProperty('--fonte', "'" + t.fonte + "', sans-serif");
+      if (t.nome_exibicao) {
+        const el = document.getElementById('sidebarBrand');
+        if (el) el.textContent = t.nome_exibicao;
+        document.title = t.nome_exibicao + ' — ' + (document.title.split(' — ')[1] || '').trim();
+      }
+    }
+    try { _applyTheme(JSON.parse(localStorage.getItem(KEY)) || {}); } catch {}
+    try {
+      const t = await api.barbearia.tema();
+      localStorage.setItem(KEY, JSON.stringify(t));
+      _applyTheme(t);
+    } catch {}
+  })();
+
+  // ── Booking banner ─────────────────────────────────────────
+  (async function() {
+    try {
+      const d = await api.barbeiro.urlAgendamento();
+      const bar  = document.getElementById('bkBar');
+      const link = document.getElementById('bkLink');
+      const href = d.url.startsWith('http') ? d.url : location.origin + d.url;
+      link.href        = href;
+      link.textContent = d.url;
+      bar.style.display = '';
+    } catch(e) { /* silencioso */ }
+  })();
+
+  function copiarLinkBk() {
+    const link = document.getElementById('bkLink');
+    navigator.clipboard?.writeText(link.href).then(() => toast('Link copiado!', 'info'));
+  }
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>
