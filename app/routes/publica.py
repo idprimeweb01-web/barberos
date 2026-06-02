@@ -47,7 +47,7 @@ def _todos_os_slots(config, data_dt, agendamentos, bloqueios):
             ), None)
             hora_str = atual.strftime('%H:%M')
             if ag_ocup:
-                cli = Cliente.query.get(ag_ocup.cliente_id)
+                cli = db.session.get(Cliente, ag_ocup.cliente_id)
                 nome_curto = (cli.nome or '?').split()[0] if cli else '?'
                 ocupados.append({'hora': hora_str, 'nome': nome_curto})
             else:
