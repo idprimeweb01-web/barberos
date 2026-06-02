@@ -303,7 +303,7 @@
         const link = document.getElementById('bkLink');
         const href = d.url.startsWith('http') ? d.url : location.origin + d.url;
         link.href        = href;
-        link.textContent = d.url;
+        link.textContent = href;
         bar.style.display = '';
       } catch(e) { /* silencioso */ }
     })();
