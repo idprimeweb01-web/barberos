@@ -58,5 +58,33 @@ def seed_admin():
     print("OK: adm@barbearia.com / 123456")
 
 
+@app.route('/init-barbearia')
+def init_barbearia():
+    from app import db
+    from app.models import Barbearia, Usuario
+    try:
+        slug = 'c.c.barber'
+        barbearia = Barbearia.query.filter_by(slug=slug).first()
+        if not barbearia:
+            barbearia = Barbearia(nome='C.C. Barber', slug=slug, ativo=True)
+            db.session.add(barbearia)
+            db.session.flush()
+            msg_b = f'Barbearia criada: id={barbearia.id}'
+        else:
+            msg_b = f'Barbearia já existe: id={barbearia.id}'
+
+        usuario = Usuario.query.filter_by(email='adm@barbearia.com').first()
+        if usuario:
+            usuario.barbearia_id = barbearia.id
+            msg_u = 'Admin vinculado à barbearia c.c.barber'
+        else:
+            msg_u = 'Usuário adm@barbearia.com não encontrado'
+
+        db.session.commit()
+        return {'status': 'ok', 'barbearia': msg_b, 'usuario': msg_u, 'slug': slug}, 200
+    except Exception as e:
+        return {'status': 'erro', 'msg': str(e)}, 500
+
+
 if __name__ == "__main__":
     app.run()

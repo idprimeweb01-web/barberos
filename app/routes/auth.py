@@ -11,7 +11,7 @@ from app.models import Usuario, Barbeiro, Barbearia, SolicitacaoSenha
 auth = Blueprint('auth', __name__, url_prefix='/auth')
 
 PERFIS_VALIDOS = {'super_admin', 'gestor', 'barbeiro', 'cliente'}
-_SLUG_RE = re.compile(r'^[a-z0-9-]+$')
+_SLUG_RE = re.compile(r'^[a-z0-9][a-z0-9.\-]*[a-z0-9]$|^[a-z0-9]$')
 
 
 def _erro(mensagem, codigo=400):
