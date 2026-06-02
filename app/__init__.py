@@ -16,12 +16,20 @@ def create_app():
     app = Flask(__name__)
 
     app.config['SECRET_KEY']                = os.getenv('SECRET_KEY')
-    db_url = os.getenv('DATABASE_URL') or ''
-    if db_url.startswith('postgres://'):
-        db_url = db_url.replace('postgres://', 'postgresql://', 1)
-    app.config['SQLALCHEMY_DATABASE_URI'] = db_url or None
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
     app.config['JWT_SECRET_KEY']            = os.getenv('JWT_SECRET_KEY', os.getenv('SECRET_KEY'))
+
+    db_url = os.getenv('DATABASE_URL', '')
+    if db_url.startswith('postgres://'):
+        db_url = db_url.replace('postgres://', 'postgresql://', 1)
+
+    if not db_url:
+        print("ERROR: DATABASE_URL is not set!", flush=True)
+        # Fallback para desenvolvimento (nunca vai rodar em prod, mas se rodar mostra o erro)
+        db_url = 'sqlite:///fallback.db'
+
+    app.config['SQLALCHEMY_DATABASE_URI'] = db_url
+    print(f"DATABASE_URI set to: {db_url[:50]}...", flush=True)
 
     db.init_app(app)
     migrate.init_app(app, db)
